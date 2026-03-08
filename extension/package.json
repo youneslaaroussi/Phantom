@@ -1,0 +1,44 @@
+{
+  "name": "phantom",
+  "displayName": "Phantom",
+  "version": "0.1.0",
+  "description": "Cloud-native AI voice agent for Chrome. Talk to Gemini Live, control any website by voice.",
+  "author": "Younes Laaroussi hello@youneslaaroussi.ca",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package"
+  },
+  "dependencies": {
+    "@plasmohq/messaging": "^0.7.2",
+    "lucide-react": "^0.511.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.304",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "plasmo": "^0.90.4"
+  },
+  "manifest": {
+    "permissions": [
+      "activeTab",
+      "sidePanel",
+      "storage",
+      "scripting",
+      "tabs",
+      "tabCapture"
+    ],
+    "host_permissions": [
+      "<all_urls>"
+    ],
+    "side_panel": {
+      "default_path": "sidepanel.html"
+    }
+  }
+}
