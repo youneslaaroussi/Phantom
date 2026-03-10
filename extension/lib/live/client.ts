@@ -1,7 +1,7 @@
 /**
- * Gemini Live API WebSocket Client for Marionette
+ * Gemini Live API WebSocket Client
  * 
- * Uses API key auth (key= param) instead of access_token.
+ * Uses API key auth (key= param).
  * Connects to v1beta endpoint.
  */
 

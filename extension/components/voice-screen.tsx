@@ -2,7 +2,7 @@
  * Voice Screen — the main Phantom interface
  * 
  * Centered mic button over a flowing wave visualizer.
- * Minimal, dark, AVS-inspired.
+ * Minimal, dark.
  */
 
 import React, { useState } from "react";

@@ -6,7 +6,7 @@ Cloud-native AI voice agent for Chrome. Talk to Gemini, control any website by v
 
 Phantom is a Chrome extension that connects you to Gemini Live for real-time voice conversations. It can see and interact with any website — clicking buttons, filling forms, navigating tabs — all through natural speech.
 
-Unlike Marionette (which runs on-device via Gemini Nano), Phantom is cloud-first. One API key, zero local models, full Gemini capabilities.
+No local models, no setup friction. One API key, full Gemini capabilities.
 
 ## Features
 

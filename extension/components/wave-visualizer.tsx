@@ -1,5 +1,5 @@
 /**
- * WebGL audio wave visualizer — the AVS-style flowing wave
+ * WebGL audio wave visualizer
  * Uses simplex noise on the GPU for organic, responsive motion.
  */
 

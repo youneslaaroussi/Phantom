@@ -1,22 +1,10 @@
 /**
  * Phantom tool system
  * 
- * Stripped-down tool set for Gemini Live:
- * - Browser navigation & interaction (tabs, clicks, forms)
+ * Browser tools for Gemini Live function calling:
+ * - Navigation & interaction (tabs, clicks, forms)
  * - Page inspection (screenshot, accessibility, title)
  * - Scrolling & keyboard
- * 
- * Dropped from Marionette:
- * - storeMemory / getMemories (Nano context window management)
- * - writeContent (Writer API — Nano only)
- * - summarizePage (Summarization API — Nano only)
- * - translateText / detectLanguage (Translation API — Nano only)
- * - think (Nano internal reasoning hack)
- * - searchVault / getVaultStats (local embedding model)
- * - getPlaybook (Nano prompt scaffolding)
- * - listen (audio capture for Nano — Live handles audio natively)
- * - highlightSelector / highlightText (visual debugging)
- * - captureCurrentPage (HTML scraping for Nano context)
  */
 
 import type { LiveToolDeclaration } from "./live/types";

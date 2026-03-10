@@ -1,5 +1,5 @@
 /**
- * Audio utilities for Gemini Live API in Marionette
+ * Audio utilities for Gemini Live API
  * Input: 16-bit PCM, 16kHz, mono
  * Output: 24kHz PCM from Gemini
  */

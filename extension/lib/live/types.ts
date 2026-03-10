@@ -1,5 +1,5 @@
 /**
- * Types for Gemini Live API integration in Marionette
+ * Types for Gemini Live API
  */
 
 export type LiveVoiceName =
