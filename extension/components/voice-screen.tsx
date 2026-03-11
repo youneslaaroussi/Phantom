@@ -50,10 +50,6 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
   const isConnecting = state.status === "connecting";
 
   const handleMicClick = async () => {
-    if (!hasApiKey) {
-      onOpenSettings();
-      return;
-    }
     if (!isConnected) {
       await connect();
       setTimeout(() => startListening(), 500);
@@ -151,8 +147,7 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
           `}
           style={state.isListening ? { transform: `scale(${1 + inputLevel * 0.15})` } : undefined}
           title={
-            !hasApiKey ? "Add API key in settings"
-            : state.isListening ? "Stop listening"
+            state.isListening ? "Stop listening"
             : isConnected ? "Start listening"
             : "Connect & start"
           }
@@ -177,13 +172,7 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
             <p className="text-red-400 text-xs">{state.error}</p>
           )}
 
-          {!hasApiKey && state.status === "disconnected" && (
-            <p className="text-gray-500 text-xs">
-              Add your Gemini API key in settings to get started
-            </p>
-          )}
-
-          {hasApiKey && !isConnected && !isConnecting && !state.error && (
+          {!isConnected && !isConnecting && !state.error && (
             <p className="text-gray-500 text-xs">Tap to start</p>
           )}
 

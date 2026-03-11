@@ -3,21 +3,30 @@
  */
 
 import React, { useState } from "react";
-import { Key, ArrowRight, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Key, ArrowRight, Eye, EyeOff, ExternalLink, Globe } from "lucide-react";
 import { saveApiKey, isValidKeyFormat } from "../lib/api-key";
+import { setConnectionMode } from "../lib/connection-mode";
 import { useSession } from "../lib/session";
 
 interface SetupScreenProps {
   onComplete: () => void;
 }
 
+type SetupMode = "choice" | "byok";
+
 export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
   const { checkApiKey } = useSession();
+  const [mode, setMode] = useState<SetupMode>("choice");
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState("");
 
-  const handleContinue = async () => {
+  const handleHosted = async () => {
+    await setConnectionMode("hosted");
+    onComplete();
+  };
+
+  const handleByok = async () => {
     const trimmed = apiKey.trim();
     if (!trimmed) {
       setError("Enter your API key to get started");
@@ -29,14 +38,57 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
     }
     setError("");
     await saveApiKey(trimmed);
+    await setConnectionMode("byok");
     await checkApiKey();
     onComplete();
   };
 
+  if (mode === "choice") {
+    return (
+      <div className="w-full h-full bg-black text-white flex flex-col items-center justify-center px-8">
+        <div className="max-w-sm w-full space-y-8">
+          <div className="text-center space-y-3">
+            <h1 className="text-xl font-bold tracking-tight">Phantom</h1>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Talk to AI. Control your browser by voice.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={handleHosted}
+              className="w-full bg-white text-black py-4 px-5 rounded-xl text-left transition-all hover:bg-gray-100"
+            >
+              <div className="flex items-center gap-3">
+                <Globe className="w-5 h-5 text-blue-600 shrink-0" />
+                <div>
+                  <div className="font-medium text-sm">Use hosted</div>
+                  <div className="text-xs text-gray-500 mt-0.5">No API key needed. We handle it.</div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setMode("byok")}
+              className="w-full bg-gray-900 border border-gray-800 text-white py-4 px-5 rounded-xl text-left transition-all hover:bg-gray-800"
+            >
+              <div className="flex items-center gap-3">
+                <Key className="w-5 h-5 text-gray-400 shrink-0" />
+                <div>
+                  <div className="font-medium text-sm">Bring your own key</div>
+                  <div className="text-xs text-gray-600 mt-0.5">Use your Gemini API key directly.</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full bg-black text-white flex flex-col items-center justify-center px-8">
       <div className="max-w-sm w-full space-y-8">
-        {/* Logo */}
         <div className="text-center space-y-3">
           <div className="flex justify-center">
             <div className="w-16 h-16 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center">
@@ -45,20 +97,19 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
           </div>
           <h1 className="text-xl font-bold tracking-tight">Phantom</h1>
           <p className="text-gray-500 text-sm leading-relaxed">
-            Talk to AI. Control your browser by voice.
+            Paste your Gemini API key to get started.
           </p>
         </div>
 
-        {/* API Key input */}
         <div className="space-y-3">
           <div className="relative">
             <input
               type={showKey ? "text" : "password"}
               value={apiKey}
               onChange={(e) => { setApiKey(e.target.value); setError(""); }}
-              placeholder="Paste your Gemini API key..."
+              placeholder="AIza..."
               className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 text-sm font-mono text-white placeholder-gray-600 focus:outline-none focus:border-gray-700 pr-10 transition-colors"
-              onKeyDown={(e) => e.key === "Enter" && handleContinue()}
+              onKeyDown={(e) => e.key === "Enter" && handleByok()}
             />
             <button
               onClick={() => setShowKey(!showKey)}
@@ -78,14 +129,22 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
           </button>
         </div>
 
-        {/* Continue */}
-        <button
-          onClick={handleContinue}
-          className="w-full bg-white text-black py-3 rounded-lg font-medium text-sm hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
-        >
-          Get Started
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        <div className="space-y-3">
+          <button
+            onClick={handleByok}
+            className="w-full bg-white text-black py-3 rounded-lg font-medium text-sm hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+          >
+            Get Started
+            <ArrowRight className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setMode("choice")}
+            className="w-full text-gray-600 hover:text-gray-400 text-xs transition-colors"
+          >
+            ← Back
+          </button>
+        </div>
 
         <p className="text-center text-[10px] text-gray-700">
           Your key stays on your device. Never shared.

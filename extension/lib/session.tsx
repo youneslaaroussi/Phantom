@@ -20,6 +20,7 @@ import React, {
 import { LiveSession } from "./live/client";
 import { getToolDeclarations, executeTool } from "./tools";
 import { getApiKey } from "./api-key";
+import { getConnectionMode, getServerUrl, type ConnectionMode } from "./connection-mode";
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
 
 const MODEL = "gemini-2.0-flash-exp";
@@ -69,12 +70,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [outputLevel, setOutputLevel] = useState(0);
   const [voice, setVoiceState] = useState<LiveVoiceName>("Kore");
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [connectionMode, setConnectionModeState] = useState<ConnectionMode>("byok");
 
   useEffect(() => {
     chrome.storage.local.get(VOICE_KEY, (r) => {
       if (r[VOICE_KEY]) setVoiceState(r[VOICE_KEY]);
     });
     getApiKey().then((k) => setHasApiKey(!!k));
+    getConnectionMode().then(setConnectionModeState);
   }, []);
 
   const setVoice = useCallback((v: LiveVoiceName) => {
@@ -93,8 +96,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const connect = useCallback(async () => {
+    const mode = await getConnectionMode();
     const apiKey = await getApiKey();
-    if (!apiKey) {
+
+    if (mode === "byok" && !apiKey) {
       setState((p) => ({ ...p, status: "error", error: "No API key. Add one in settings." }));
       return;
     }
@@ -135,8 +140,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     sessionRef.current = session;
 
     try {
-      await session.connect(apiKey);
-      setHasApiKey(true);
+      if (mode === "hosted") {
+        const serverUrl = await getServerUrl();
+        const wsUrl = serverUrl.replace(/\/$/, "") + "/ws/live";
+        await session.connect({ proxyUrl: wsUrl });
+      } else {
+        await session.connect({ apiKey: apiKey! });
+        setHasApiKey(true);
+      }
     } catch (err) {
       console.error("[Phantom] Connect failed:", err);
     }

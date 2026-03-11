@@ -3,19 +3,32 @@ import { SessionProvider, useSession } from "./lib/session";
 import { VoiceScreen } from "./components/voice-screen";
 import { SettingsScreen } from "./components/settings-screen";
 import { SetupScreen } from "./components/setup-screen";
+import { getConnectionMode } from "./lib/connection-mode";
 import "./style.css";
 
-type Screen = "voice" | "settings" | "setup";
+type Screen = "voice" | "settings" | "setup" | "loading";
 
 const App = () => {
   const { hasApiKey } = useSession();
-  const [screen, setScreen] = useState<Screen>(hasApiKey ? "voice" : "setup");
+  const [screen, setScreen] = useState<Screen>("loading");
 
   useEffect(() => {
-    if (hasApiKey && screen === "setup") setScreen("voice");
-  }, [hasApiKey, screen]);
+    (async () => {
+      const mode = await getConnectionMode();
+      if (mode === "hosted" || hasApiKey) {
+        setScreen("voice");
+      } else {
+        const stored = await new Promise<string | null>((resolve) => {
+          chrome.storage.local.get("phantom_connection_mode", (r) => resolve(r.phantom_connection_mode || null));
+        });
+        setScreen(stored ? "voice" : "setup");
+      }
+    })();
+  }, [hasApiKey]);
 
-  if (screen === "setup" && !hasApiKey) {
+  if (screen === "loading") return <div className="w-full h-full bg-black" />;
+
+  if (screen === "setup") {
     return <SetupScreen onComplete={() => setScreen("voice")} />;
   }
 
