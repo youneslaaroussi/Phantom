@@ -21,6 +21,7 @@ import { LiveSession } from "./live/client";
 import { getToolDeclarations, executeTool } from "./tools";
 import { getApiKey } from "./api-key";
 import { getConnectionMode, getServerUrl, type ConnectionMode } from "./connection-mode";
+import { startVision, stopVision, isVisionActive } from "./vision";
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
 
 const MODEL = "gemini-2.0-flash-exp";
@@ -30,13 +31,18 @@ const SYSTEM_INSTRUCTION = `You are Phantom, a voice-controlled AI agent that ca
 
 You have tools to navigate tabs, click elements, fill forms, take screenshots, and more. Use them proactively.
 
+You may also receive periodic screenshots of the user's current tab. When you see these frames, you have continuous visual context of what the user is looking at. Use this to:
+- Proactively comment on what's happening if relevant
+- Answer questions about page content without needing to take a separate screenshot
+- Notice changes (page loads, errors, new content) and react naturally
+
 Guidelines:
 - Be concise in speech — the user is listening, not reading
 - When asked to do something on a page, use getAccessibilitySnapshot first to understand the layout
 - After clicking or filling, briefly confirm what you did
 - If something fails, explain what went wrong and try an alternative approach
 - Don't read long text aloud — summarize it instead
-- When the user asks "what do you see", take a screenshot and describe it`;
+- When you have vision enabled, you can see the page already — no need to take screenshots unless you need higher detail`;
 
 interface SessionContextValue {
   state: LiveSessionState;
@@ -53,6 +59,10 @@ interface SessionContextValue {
   setVoice: (v: LiveVoiceName) => void;
   hasApiKey: boolean;
   checkApiKey: () => Promise<boolean>;
+  /** Whether vision (screen streaming) is enabled */
+  visionEnabled: boolean;
+  /** Toggle vision on/off */
+  setVisionEnabled: (enabled: boolean) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -71,6 +81,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [voice, setVoiceState] = useState<LiveVoiceName>("Kore");
   const [hasApiKey, setHasApiKey] = useState(false);
   const [connectionMode, setConnectionModeState] = useState<ConnectionMode>("byok");
+  const [visionEnabled, setVisionEnabledState] = useState(false);
 
   useEffect(() => {
     chrome.storage.local.get(VOICE_KEY, (r) => {
@@ -154,6 +165,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [voice]);
 
   const disconnect = useCallback(() => {
+    stopVision();
     sessionRef.current?.disconnect();
     sessionRef.current = null;
     setTranscript("");
@@ -161,6 +173,29 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setInputLevel(0);
     setOutputLevel(0);
   }, []);
+
+  // Vision toggle
+  const setVisionEnabled = useCallback((enabled: boolean) => {
+    setVisionEnabledState(enabled);
+    if (enabled && sessionRef.current?.isConnected()) {
+      startVision((base64, mimeType) => {
+        sessionRef.current?.sendImage(base64, mimeType);
+      });
+    } else {
+      stopVision();
+    }
+  }, []);
+
+  // Start/stop vision when connection state changes
+  useEffect(() => {
+    if (visionEnabled && state.status === "connected" && sessionRef.current) {
+      startVision((base64, mimeType) => {
+        sessionRef.current?.sendImage(base64, mimeType);
+      });
+    } else {
+      stopVision();
+    }
+  }, [state.status, visionEnabled]);
 
   const startListening = useCallback(async (deviceId?: string) => {
     if (!sessionRef.current?.isConnected()) {
@@ -205,6 +240,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setVoice,
         hasApiKey,
         checkApiKey,
+        visionEnabled,
+        setVisionEnabled,
       }}
     >
       {children}

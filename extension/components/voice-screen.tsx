@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from "react";
-import { Mic, Square, Settings, ChevronDown, Volume2 } from "lucide-react";
+import { Mic, Square, Settings, ChevronDown, Volume2, Eye, EyeOff } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
 import type { LiveVoiceName } from "../lib/live/types";
@@ -41,6 +41,8 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
     voice,
     setVoice,
     hasApiKey,
+    visionEnabled,
+    setVisionEnabled,
   } = useSession();
 
   const [textInput, setTextInput] = useState("");
@@ -91,13 +93,29 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
       {/* Header */}
       <div className="relative z-20 flex items-center justify-between px-4 py-3">
         <div className="font-mono text-xs tracking-widest text-gray-500">PHANTOM</div>
-        <button
-          onClick={onOpenSettings}
-          className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-          title="Settings"
-        >
-          <Settings className="w-4 h-4 text-gray-500" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setVisionEnabled(!visionEnabled)}
+            className={`p-1.5 rounded-lg transition-colors ${
+              visionEnabled
+                ? "bg-blue-500/20 text-blue-400"
+                : "hover:bg-white/5 text-gray-500"
+            }`}
+            title={visionEnabled ? "Vision on — streaming screen" : "Vision off"}
+          >
+            {visionEnabled
+              ? <Eye className="w-4 h-4" />
+              : <EyeOff className="w-4 h-4" />
+            }
+          </button>
+          <button
+            onClick={onOpenSettings}
+            className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
       </div>
 
       {/* Main area — wave + mic button */}
