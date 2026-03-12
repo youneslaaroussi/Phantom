@@ -1,45 +1,3 @@
-#!/bin/bash
-set -e
-
-PHANTOM="/root/.openclaw/workspace-mrclaude2/phantom"
-SERVER="/root/.openclaw/workspace-mrclaude2/phantom-server"
-MONO="/root/.openclaw/workspace-mrclaude2/phantom-monorepo"
-
-cd "$MONO"
-
-# Get phantom commit info
-PHANTOM_LOG=$(cd "$PHANTOM" && git log --reverse --format='%H|%aI|%s')
-SERVER_LOG=$(cd "$SERVER" && git log --reverse --format='%H|%aI|%s')
-
-# Process each phantom commit
-while IFS='|' read -r hash date msg; do
-  # Clear and repopulate extension/ from this commit
-  rm -rf extension/
-  mkdir -p extension
-  (cd "$PHANTOM" && git archive "$hash") | tar x -C extension/
-  
-  git add -A
-  GIT_COMMITTER_DATE="$date" GIT_AUTHOR_DATE="$date" \
-    git commit -m "extension: $msg" --date="$date" --allow-empty 2>/dev/null || true
-  
-  echo "✓ $date  extension: $msg"
-done <<< "$PHANTOM_LOG"
-
-# Now add server commits
-while IFS='|' read -r hash date msg; do
-  rm -rf server/
-  mkdir -p server
-  (cd "$SERVER" && git archive "$hash") | tar x -C server/
-  
-  git add -A
-  GIT_COMMITTER_DATE="$date" GIT_AUTHOR_DATE="$date" \
-    git commit -m "server: $msg" --date="$date" --allow-empty 2>/dev/null || true
-  
-  echo "✓ $date  server: $msg"
-done <<< "$SERVER_LOG"
-
-# Add root README as final commit
-cat > README.md << 'ROOTREADME'
 # Phantom
 
 <div align="center">
@@ -103,13 +61,3 @@ See each package's README for full setup instructions.
 ## License
 
 MIT — See [LICENSE](./extension/LICENSE)
-ROOTREADME
-
-git add README.md
-D="2026-03-12T18:30:00"
-GIT_COMMITTER_DATE="$D" GIT_AUTHOR_DATE="$D" \
-  git commit -m "docs: root README with monorepo structure" --date="$D"
-
-echo ""
-echo "=== Done ==="
-git log --oneline --format='%ad  %s' --date=format:'%b %d %H:%M'
