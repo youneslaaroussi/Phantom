@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phantom — AI Voice Agent for Chrome</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Nav */
+    nav {
+      padding: 20px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 13px;
+      letter-spacing: 0.2em;
+      color: #666;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .nav-links a {
+      color: #666;
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: #fff; }
+
+    /* Hero */
+    .hero {
+      padding: 120px 0 80px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: clamp(42px, 7vw, 72px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 18px;
+      color: #888;
+      max-width: 500px;
+      margin: 0 auto 40px;
+      line-height: 1.6;
+    }
+
+    .cta-group {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #fff;
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      background: #e5e5e5;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: #999;
+      border: 1px solid #333;
+    }
+
+    .btn-secondary:hover {
+      border-color: #666;
+      color: #fff;
+    }
+
+    /* Features */
+    .features {
+      padding: 80px 0;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+    }
+
+    .feature {
+      padding: 28px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid #1a1a1a;
+      border-radius: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .feature:hover { border-color: #333; }
+
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 16px;
+    }
+
+    .feature h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feature p {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    /* How it works */
+    .how {
+      padding: 80px 0;
+      text-align: center;
+    }
+
+    .how h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 48px;
+      letter-spacing: -0.02em;
+    }
+
+    .steps {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .step {
+      flex: 1;
+      min-width: 180px;
+      max-width: 220px;
+    }
+
+    .step-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #111;
+      border: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: monospace;
+      font-size: 14px;
+      color: #666;
+      margin: 0 auto 16px;
+    }
+
+    .step h3 {
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .step p {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      border-top: 1px solid #111;
+      text-align: center;
+    }
+
+    footer p {
+      font-size: 12px;
+      color: #444;
+    }
+
+    footer a {
+      color: #666;
+      text-decoration: none;
+    }
+
+    footer a:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <div class="logo">PHANTOM</div>
+      <div class="nav-links">
+        <a href="https://github.com/youneslaaroussi/phantom">GitHub</a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <h1>Talk to your <span class="gradient">browser</span></h1>
+      <p>Phantom is a Chrome extension that lets you control any website with your voice. Powered by Gemini Live.</p>
+      <div class="cta-group">
+        <a href="#install" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Install Extension
+        </a>
+        <a href="https://github.com/youneslaaroussi/phantom" class="btn btn-secondary">View Source</a>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="features-grid">
+        <div class="feature">
+          <div class="feature-icon">🎙️</div>
+          <h3>Voice Control</h3>
+          <p>Real-time bidirectional audio with Gemini Live. Talk naturally, get spoken responses.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">👁️</div>
+          <h3>Sees Your Screen</h3>
+          <p>Takes screenshots and reads accessibility trees to understand any webpage.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🖱️</div>
+          <h3>Takes Action</h3>
+          <p>Clicks buttons, fills forms, navigates tabs, scrolls pages — all by voice command.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⚡</div>
+          <h3>Zero Setup</h3>
+          <p>No local models, no downloads. Just an API key and you're live.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="how" id="install">
+      <h2>Get started in 30 seconds</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <h3>Get an API key</h3>
+          <p>Free from <a href="https://aistudio.google.com/apikey" style="color:#3b82f6">Google AI Studio</a></p>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <h3>Install extension</h3>
+          <p>Load unpacked from the repo in Chrome developer mode</p>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <h3>Talk</h3>
+          <p>Click the mic and tell Phantom what to do</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>Built by <a href="https://github.com/youneslaaroussi">Younes Laaroussi</a></p>
+    </footer>
+  </div>
+</body>
+</html>
