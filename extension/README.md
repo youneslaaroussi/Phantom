@@ -1,57 +1,417 @@
 # Phantom
 
-Cloud-native AI voice agent for Chrome. Talk to Gemini, control any website by voice.
+<div align="center">
 
-## What is this?
+**Voice-controlled AI agent that can see and interact with any website**
 
-Phantom is a Chrome extension that connects you to Gemini Live for real-time voice conversations. It can see and interact with any website — clicking buttons, filling forms, navigating tabs — all through natural speech.
+**Real-time conversation · Screen vision · Browser automation**
 
-No local models, no setup friction. One API key, full Gemini capabilities.
+![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)
+![Gemini Live](https://img.shields.io/badge/Gemini-Live_API-4285F4)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Plasmo](https://img.shields.io/badge/Plasmo-Framework-a855f7)
+![Google Cloud](https://img.shields.io/badge/Google_Cloud-Run-4285F4?logo=googlecloud&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
-## Features
+</div>
 
-- **Real-time voice chat** — bidirectional audio streaming via Gemini Live API
-- **Browser control** — 12 tools: screenshots, accessibility tree, click, fill, scroll, tabs
-- **WebGL visualizer** — GPU-accelerated wave that responds to speech
-- **Voice selection** — 8 Gemini voices (Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr)
-- **Text fallback** — type commands when you can't speak
+---
 
-## Setup
+## Table of Contents
 
-1. Get a [Gemini API key](https://aistudio.google.com/apikey) (free)
-2. Load the extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked)
-3. Click the extension icon, paste your key
-4. Tap the mic and talk
+- [Overview](#overview)
+- [Architecture](#architecture)
+  - [System Overview](#system-overview)
+  - [Gemini Live Session](#gemini-live-session)
+  - [Vision Pipeline](#vision-pipeline)
+  - [Tool Execution](#tool-execution)
+  - [Connection Modes](#connection-modes)
+- [Design Notes](#design-notes)
+  - [Why Live API](#why-live-api)
+  - [Vision: Continuous vs On-Demand](#vision-continuous-vs-on-demand)
+  - [System Prompt Awareness](#system-prompt-awareness)
+  - [Audio Pipeline](#audio-pipeline)
+  - [Browser Tools](#browser-tools)
+- [Setup](#setup)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
 
-## Development
+---
 
-```bash
-pnpm install
-pnpm dev
-```
+## Overview
+
+Phantom is a Chrome extension that turns your browser into a voice-controlled workspace. You talk, it listens, sees your screen, and takes action — clicking buttons, filling forms, navigating tabs, all through natural conversation powered by Gemini's Live API.
+
+**What makes it different:**
+
+- **Real-time voice, not chat.** Bidirectional audio streaming over WebSocket. You can interrupt it mid-sentence. It responds instantly. No typing, no waiting for transcription — just talk.
+- **It can see your screen.** Toggle vision mode and Phantom streams your active tab as JPEG frames to Gemini every 3 seconds. It knows what you're looking at without you having to describe it.
+- **It takes action.** 12 browser tools via function calling — click elements, fill inputs, scroll pages, switch tabs, press keys. The model decides what to do and does it.
+- **Zero infrastructure for users.** Either paste your own Gemini API key (free from Google AI Studio) or connect through our hosted proxy. No local models, no downloads, no setup friction.
+
+**Key Capabilities:**
+
+- 🎙️ Real-time bidirectional voice (Gemini Live API, WebSocket)
+- 👁️ Continuous screen vision with change detection
+- 🖱️ 12 browser automation tools via function calling
+- 🌊 WebGL audio visualizer (state-aware color changes)
+- 🔌 Hosted mode (Cloud Run proxy) or BYOK (bring your own key)
+- 8 voice options (Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr)
+- Text input fallback for quiet environments
+- "Phantom is watching" indicator on page when vision is active
+
+---
 
 ## Architecture
 
+### System Overview
+
+<div align="center">
+<img src="./diagrams/system_architecture.png" alt="System Architecture" width="800" />
+</div>
+
+The system has four layers:
+
+1. **User Input** — Voice (microphone → AudioWorklet → PCM 16kHz) or text (keyboard)
+2. **Chrome Extension** — Session provider orchestrates audio capture, audio playback, vision module, and tool execution
+3. **Connection** — Mode switch routes to either direct WebSocket (BYOK) or Cloud Run proxy (hosted)
+4. **Gemini Live API** — `gemini-2.0-flash-exp` processes audio, generates spoken responses, and issues function calls for browser tools
+
+Audio flows bidirectionally through a single persistent WebSocket. Tool calls arrive as structured JSON, get executed against Chrome APIs, and results feed back into the conversation.
+
+### Gemini Live Session
+
+<div align="center">
+<img src="./diagrams/live_session.png" alt="Live Session Flow" width="700" />
+</div>
+
+The Live API uses a single WebSocket connection for everything:
+
+**Inbound (user → Gemini):**
+- `realtimeInput` — PCM audio chunks from the microphone at 16kHz
+- `realtimeInput` — JPEG frames from vision module
+- `clientContent` — Text messages
+- `toolResponse` — Results from executed browser tools
+
+**Outbound (Gemini → user):**
+- `serverContent` — Audio chunks for speech playback
+- `toolCall` — Function call requests (tool name + arguments)
+- `setupComplete` — Session ready signal
+
+The session starts with a `setup` message containing the model config, system instruction, tool declarations, and voice selection. After `setupComplete`, audio flows freely in both directions. The connection stays open for the entire conversation — no request/response cycles, just continuous streaming.
+
+**Interruption handling:** When the user speaks while Gemini is responding, the model detects the interruption and stops its current output. This happens at the protocol level — no special client logic needed.
+
+### Vision Pipeline
+
+<div align="center">
+<img src="./diagrams/vision_pipeline.png" alt="Vision Pipeline" width="600" />
+</div>
+
+Vision mode streams periodic screenshots of the active tab to Gemini:
+
+1. **User toggles the eye icon** in the header
+2. **Interval timer** fires every 3 seconds
+3. **`chrome.tabs.captureVisibleTab()`** captures the active tab as JPEG at 50% quality
+4. **Change detection** compares frame signatures — if nothing changed, the frame is skipped
+5. **`sendImage()`** sends the JPEG base64 to Gemini via the WebSocket
+6. **Page indicator** — a "Phantom is watching" pill with a pulsing blue dot is injected into the active tab
+
+When the user switches tabs, the indicator follows — the old one is removed and a new one is injected into the new active tab.
+
+**Why 3 seconds?** Too frequent and Gemini's context fills up fast, causing crashes. Too infrequent and you miss page changes. 3 seconds with change detection hits the sweet spot — most static browsing sends very few frames, while active navigation captures every meaningful state.
+
+**Why 50% JPEG?** Gemini doesn't need retina-quality screenshots to understand page layout. Low quality keeps frame size small (~30-60KB) which matters when you're sending frames every few seconds over a WebSocket.
+
+### Tool Execution
+
+<div align="center">
+<img src="./diagrams/tool_execution.png" alt="Tool Execution" width="700" />
+</div>
+
+When Gemini decides to take action, it sends a `toolCall` message with a function name and arguments. The tool executor dispatches to the appropriate Chrome API:
+
+**Navigation (4 tools):**
+
+| Tool | What it does |
+|------|-------------|
+| `getPageTitle` | Returns title and URL of the active tab |
+| `openTab` | Opens a URL in a new or current tab |
+| `getTabs` | Lists all open tabs with titles and URLs |
+| `switchTab` | Activates a tab by index |
+
+**Interaction (5 tools):**
+
+| Tool | What it does |
+|------|-------------|
+| `clickElement` | Clicks an element by CSS selector |
+| `fillInput` | Sets the value of an input field |
+| `pressKey` | Dispatches a keyboard event (Enter, Escape, Tab, etc.) |
+| `scrollDown` | Scrolls the page down by a specified amount |
+| `scrollUp` | Scrolls the page up by a specified amount |
+
+**Inspection (3 tools):**
+
+| Tool | What it does |
+|------|-------------|
+| `captureScreenshot` | Takes a JPEG screenshot of the visible tab |
+| `getAccessibilitySnapshot` | Reads the accessibility tree — interactive elements with roles, labels, and selectors |
+| `findElements` | Searches the page for elements matching a natural language query |
+
+After execution, the result is sent back to Gemini as a `toolResponse`, and the model continues — it might speak a confirmation, call another tool, or ask a follow-up question. This creates an autonomous agent loop: observe → decide → act → observe.
+
+### Connection Modes
+
+<div align="center">
+<img src="./diagrams/connection_modes.png" alt="Connection Modes" width="700" />
+</div>
+
+Phantom supports two connection modes, selected during setup:
+
+**BYOK (Bring Your Own Key):**
+- Extension connects directly to `wss://generativelanguage.googleapis.com/ws/...?key=YOUR_KEY`
+- API key stored locally in `chrome.storage`
+- No intermediary, lowest latency
+- User gets their own Gemini quota
+
+**Hosted:**
+- Extension connects to Cloud Run proxy at `/ws/live`
+- Proxy opens a parallel WebSocket to Gemini using a server-side API key
+- User doesn't need an API key
+- Messages relayed bidirectionally, buffered during upstream connection
+
+The Cloud Run proxy is a lightweight Hono server (~140 lines) that adds no processing overhead — it's a transparent WebSocket relay. See [phantom-server](https://github.com/youneslaaroussi/phantom-server) for the backend.
+
+---
+
+## Design Notes
+
+### Why Live API
+
+The Gemini Live API is fundamentally different from the standard Gemini chat API. It's not request/response — it's a persistent bidirectional stream. Audio goes in, audio comes out, function calls happen inline, and the model maintains conversational state across the entire session.
+
+This matters for a voice agent because:
+- **No transcription step.** Voice goes directly to the model as PCM audio. No Speech-to-Text → LLM → Text-to-Speech pipeline.
+- **Natural interruption.** The user can speak while the model is responding, and it handles it gracefully.
+- **Continuous context.** The model accumulates context from everything — voice, text, images, tool results — in a single session.
+- **Low latency.** One persistent WebSocket vs. repeated HTTP requests. Response starts streaming immediately.
+
+### Vision: Continuous vs On-Demand
+
+Phantom supports both approaches:
+
+**Continuous (vision mode ON):** Frames stream automatically every 3 seconds. The model has ambient awareness of the screen. Good for guided workflows — "walk me through this form", "what am I looking at", "tell me when the page loads".
+
+**On-demand (vision mode OFF):** The model uses `captureScreenshot` as a tool — it explicitly requests a screenshot when it needs visual context. Good for privacy and when you don't want constant screen capture.
+
+The system prompt changes based on which mode is active:
+
+```
+Vision ON:  "You are receiving periodic screenshots. Describe what you 
+            actually see. Do NOT hallucinate page content."
+
+Vision OFF: "You cannot see the screen. Use captureScreenshot or 
+            getAccessibilitySnapshot. Do NOT guess what's on the page."
+```
+
+This prevents the model from confidently describing a page it can't actually see — a common failure mode with multimodal models.
+
+### System Prompt Awareness
+
+The system prompt explicitly tells Gemini what capabilities are currently available. This is critical because the Live API model will happily hallucinate visual descriptions if it thinks it has vision when it doesn't.
+
+We split the prompt into a base instruction (always present) and an addendum that changes based on state:
+- **Vision ON addendum** — tells the model it's receiving frames, can reference screen content, should not take redundant screenshots
+- **Vision OFF addendum** — tells the model it's blind, must use tools, should not guess
+
+When the user toggles vision, the next `connect()` call rebuilds the system prompt with the correct addendum. This means the model always has accurate self-knowledge.
+
+### Audio Pipeline
+
+**Input:** Browser's `getUserMedia()` → `AudioWorklet` processing node → PCM Int16 at 16kHz → base64 encoded → sent as `realtimeInput` over WebSocket.
+
+The AudioWorklet runs in a separate thread, sampling audio in real-time without blocking the main thread. Input levels are reported back for the UI visualizer.
+
+**Output:** Base64 PCM chunks arrive from Gemini → decoded to Int16 array → queued in an `AudioPlayer` that manages a Web Audio API playback pipeline with `AudioBufferSourceNode` scheduling. Output levels drive the wave visualizer.
+
+The wave visualizer is a WebGL shader using simplex noise, with color driven by state:
+- **Red** — listening (microphone active)
+- **Blue** — speaking (audio playing)
+- **Purple** — executing a tool
+
+### Browser Tools
+
+Tools are declared to Gemini as `functionDeclarations` in the session setup. The model calls them via structured JSON in `toolCall` messages. Each tool:
+
+1. Receives parsed arguments from the model
+2. Executes via Chrome Extension APIs (`chrome.tabs`, `chrome.scripting`)
+3. Returns a JSON result (`{ success, result?, error? }`)
+4. Result is sent back as a `toolResponse` message
+
+For DOM interaction tools (`clickElement`, `fillInput`, `findElements`, `getAccessibilitySnapshot`), we use `chrome.scripting.executeScript()` to inject a function into the active tab. This runs in the page's context with full DOM access.
+
+The accessibility snapshot walks the DOM tree, collecting interactive elements (links, buttons, inputs, selects, textareas) with their roles, labels, and CSS selectors. This gives Gemini a structured view of actionable elements without needing to process a screenshot.
+
+`findElements` takes a natural language query and searches the page for matching elements by text content, aria-label, placeholder, or role — returning indexed results the model can reference in subsequent `clickElement` or `fillInput` calls.
+
+---
+
+## Setup
+
+### Prerequisites
+
+- Chrome 131+ (for Gemini Live API support)
+- A Gemini API key (free from [Google AI Studio](https://aistudio.google.com/apikey)) — or use hosted mode
+
+### Installation
+
+```bash
+# Clone repository
+git clone https://github.com/youneslaaroussi/phantom.git
+cd phantom
+
+# Install dependencies
+pnpm install
+
+# Start development server
+pnpm dev
+
+# Load in Chrome:
+# 1. Go to chrome://extensions
+# 2. Enable "Developer mode"
+# 3. Click "Load unpacked"
+# 4. Select the build/chrome-mv3-dev directory
+```
+
+### Production Build
+
+```bash
+pnpm build
+# Load build/chrome-mv3-prod in Chrome
+```
+
+### First Run
+
+1. Click the Phantom icon in your toolbar (or open the side panel)
+2. Choose your connection mode:
+   - **Use hosted** — No API key needed, connects through our Cloud Run proxy
+   - **Bring your own key** — Paste your Gemini API key (stays on your device)
+3. Click the mic button and start talking
+
+### Quick Start
+
+**Voice commands:**
+- "Open YouTube" → opens youtube.com in a new tab
+- "Click the search button" → finds and clicks the search button
+- "Fill the email field with hello@example.com" → fills the input
+- "What's on this page?" → takes a screenshot and describes it
+- "Scroll down" → scrolls the page
+
+**Vision mode:**
+- Click the eye icon in the header to toggle
+- When active, Phantom streams your screen to Gemini every 3 seconds
+- A "Phantom is watching" indicator appears on the page
+- Ask "what do you see?" and it describes your current page in real-time
+
+---
+
+## Tech Stack
+
+| Category | Technology | Purpose |
+|----------|-----------|---------|
+| Framework | Plasmo | Chrome extension framework with React support |
+| Language | TypeScript 5.7 | Type-safe development |
+| UI | React 18 + Tailwind CSS | Component-based interface |
+| AI | Gemini Live API | Real-time voice + vision + function calling |
+| Audio | Web Audio API + AudioWorklet | Microphone capture and playback |
+| Graphics | WebGL + GLSL | Audio wave visualizer |
+| Backend | Hono | WebSocket proxy server |
+| Deploy | Google Cloud Run | Hosted proxy infrastructure |
+| Build | esbuild (via Plasmo) | Fast bundling |
+
+---
+
+## Project Structure
+
 ```
 phantom/
-├── lib/
-│   ├── live/          # Gemini Live WebSocket client
-│   │   ├── client.ts  # Connection, audio streaming, tool dispatch
-│   │   ├── audio.ts   # PCM capture (16kHz) + playback (24kHz)
-│   │   └── types.ts   # Protocol types
-│   ├── api-key.ts     # chrome.storage API key management
-│   ├── session.tsx     # React context for session lifecycle
-│   └── tools.ts       # Browser tool declarations + execution
+├── popup.tsx                    # Popup entry point
+├── sidepanel.tsx                # Side panel entry point
+├── background.ts                # Service worker (side panel registration)
 ├── components/
-│   ├── voice-screen.tsx    # Main UI
-│   ├── settings-screen.tsx # Key management
-│   ├── setup-screen.tsx    # First-run onboarding
-│   └── wave-visualizer.tsx # WebGL simplex noise wave
-├── sidepanel.tsx      # Side panel entry
-├── popup.tsx          # Popup entry
-└── background.ts      # Service worker
+│   ├── voice-screen.tsx         # Main UI — mic button, wave, controls, vision toggle
+│   ├── settings-screen.tsx      # API key management, voice selection
+│   ├── setup-screen.tsx         # First-run: hosted vs BYOK choice
+│   └── wave-visualizer.tsx      # WebGL simplex noise visualizer
+├── lib/
+│   ├── session.tsx              # Session provider — connects everything
+│   ├── tools.ts                 # 12 browser tool declarations + execution
+│   ├── vision.ts                # Screen capture, change detection, frame streaming
+│   ├── vision-indicator.ts      # "Phantom is watching" page injection
+│   ├── api-key.ts               # Chrome storage API key management
+│   ├── connection-mode.ts       # Hosted vs BYOK mode persistence
+│   └── live/
+│       ├── client.ts            # WebSocket client, message handling, state machine
+│       ├── audio.ts             # AudioWorklet capture + AudioPlayer playback
+│       ├── types.ts             # Live API message types
+│       └── index.ts             # Re-exports
+├── diagrams/                    # Architecture diagrams (Python + Graphviz)
+├── style.css                    # Tailwind entry
+├── package.json
+├── tsconfig.json
+├── tailwind.config.js
+└── postcss.config.js
 ```
+
+---
+
+## Contributing
+
+### Adding a New Tool
+
+1. Add the declaration to `getToolDeclarations()` in `lib/tools.ts`:
+
+```typescript
+{
+  name: "myTool",
+  description: "What this tool does",
+  parameters: {
+    type: "object",
+    properties: {
+      param: { type: "string", description: "What this param is" },
+    },
+    required: ["param"],
+  },
+}
+```
+
+2. Add the execution handler in `executeTool()`:
+
+```typescript
+case "myTool": {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return { success: false, error: "No active tab" };
+  // Do something with chrome APIs
+  return { success: true, result: "Done" };
+}
+```
+
+That's it. Gemini will see the tool in its function declarations and call it when appropriate.
+
+### Regenerating Diagrams
+
+```bash
+cd diagrams
+pip install graphviz
+bash generate_all.sh
+```
+
+Requires the `graphviz` system package (`apt install graphviz` or `brew install graphviz`).
+
+---
 
 ## License
 
-MIT
+MIT License — See [LICENSE](./LICENSE)
