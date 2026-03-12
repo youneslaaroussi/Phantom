@@ -27,22 +27,32 @@ import type { LiveSessionState, LiveVoiceName } from "./live/types";
 const MODEL = "gemini-2.0-flash-exp";
 const VOICE_KEY = "phantom_voice";
 
-const SYSTEM_INSTRUCTION = `You are Phantom, a voice-controlled AI agent that can browse and interact with any website.
+const SYSTEM_INSTRUCTION_BASE = `You are Phantom, a voice-controlled AI agent that can browse and interact with any website.
 
 You have tools to navigate tabs, click elements, fill forms, take screenshots, and more. Use them proactively.
-
-You may also receive periodic screenshots of the user's current tab. When you see these frames, you have continuous visual context of what the user is looking at. Use this to:
-- Proactively comment on what's happening if relevant
-- Answer questions about page content without needing to take a separate screenshot
-- Notice changes (page loads, errors, new content) and react naturally
 
 Guidelines:
 - Be concise in speech — the user is listening, not reading
 - When asked to do something on a page, use getAccessibilitySnapshot first to understand the layout
 - After clicking or filling, briefly confirm what you did
 - If something fails, explain what went wrong and try an alternative approach
-- Don't read long text aloud — summarize it instead
-- When you have vision enabled, you can see the page already — no need to take screenshots unless you need higher detail`;
+- Don't read long text aloud — summarize it instead`;
+
+const VISION_ON_ADDENDUM = `
+
+VISION MODE IS ACTIVE. You are receiving periodic screenshots of the user's screen every few seconds. You can see what they see.
+- You can reference what's on screen directly — no need to take separate screenshots
+- Notice changes (page loads, errors, new content) and react naturally
+- If the user asks "what do you see" or "what's on my screen", describe the latest frame
+- Do NOT hallucinate page content — only describe what you actually see in frames`;
+
+const VISION_OFF_ADDENDUM = `
+
+VISION MODE IS OFF. You cannot see the user's screen. You must use tools to inspect pages:
+- Use captureScreenshot to see the page visually
+- Use getAccessibilitySnapshot to read page structure
+- Do NOT guess or assume what's on the page without using a tool first
+- If the user asks "what do you see", use captureScreenshot then describe it`;
 
 interface SessionContextValue {
   state: LiveSessionState;
@@ -125,7 +135,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const session = new LiveSession(
       {
         model: MODEL,
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: SYSTEM_INSTRUCTION_BASE + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
         tools,
         responseModalities: ["AUDIO"],
         voice,
@@ -162,7 +172,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.error("[Phantom] Connect failed:", err);
     }
-  }, [voice]);
+  }, [voice, visionEnabled]);
 
   const disconnect = useCallback(() => {
     stopVision();
