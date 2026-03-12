@@ -191,7 +191,8 @@ async function executeToolInternal(
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId!, { format: "jpeg", quality: 60 });
-      return { success: true, result: dataUrl };
+      const base64 = dataUrl.replace(/^data:image\/jpeg;base64,/, "");
+      return { success: true, result: `Screenshot captured (${Math.round(base64.length / 1024)}KB). Image data is being sent to you.`, _imageData: base64, _imageMimeType: "image/jpeg" };
     }
 
     case "getAccessibilitySnapshot": {

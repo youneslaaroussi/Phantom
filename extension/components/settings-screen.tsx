@@ -3,8 +3,9 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Eye, EyeOff, CheckCircle, ExternalLink, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, CheckCircle, ExternalLink, Trash2, Globe, Key } from "lucide-react";
 import { getApiKey, saveApiKey, removeApiKey, isValidKeyFormat } from "../lib/api-key";
+import { getConnectionMode, setConnectionMode, type ConnectionMode } from "../lib/connection-mode";
 import { useSession } from "../lib/session";
 
 interface SettingsScreenProps {
@@ -18,11 +19,13 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState("");
   const [version, setVersion] = useState("");
+  const [connMode, setConnMode] = useState<ConnectionMode>("byok");
 
   useEffect(() => {
     getApiKey().then((k) => {
       if (k) { setApiKeyState(k); setSaved(true); }
     });
+    getConnectionMode().then(setConnMode);
     setVersion(chrome.runtime.getManifest().version);
   }, []);
 
@@ -70,6 +73,35 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-md mx-auto space-y-6">
+          {/* Connection Mode */}
+          <div className="space-y-3">
+            <div className="text-[10px] text-gray-600 font-mono uppercase tracking-wider">Connection</div>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => { await setConnectionMode("hosted"); setConnMode("hosted"); disconnect(); }}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-mono transition-all flex items-center justify-center gap-2 ${
+                  connMode === "hosted"
+                    ? "bg-blue-600/20 border border-blue-500/50 text-blue-400"
+                    : "bg-gray-900 border border-gray-800 text-gray-500 hover:bg-gray-800"
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                Hosted
+              </button>
+              <button
+                onClick={async () => { await setConnectionMode("byok"); setConnMode("byok"); disconnect(); }}
+                className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-mono transition-all flex items-center justify-center gap-2 ${
+                  connMode === "byok"
+                    ? "bg-blue-600/20 border border-blue-500/50 text-blue-400"
+                    : "bg-gray-900 border border-gray-800 text-gray-500 hover:bg-gray-800"
+                }`}
+              >
+                <Key className="w-3.5 h-3.5" />
+                Own Key
+              </button>
+            </div>
+          </div>
+
           {/* API Key */}
           <div className="space-y-3">
             <div className="text-[10px] text-gray-600 font-mono uppercase tracking-wider">Gemini API Key</div>

@@ -146,7 +146,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         onToolCall: async (tc) => {
           setExecutingTool(tc.name);
           try {
-            return await executeTool(tc.name, tc.args);
+            const result = await executeTool(tc.name, tc.args);
+            // If tool returned image data, send it as a frame to the session
+            if (result._imageData && result._imageMimeType) {
+              session.sendImage(result._imageData as string, result._imageMimeType as string);
+              delete result._imageData;
+              delete result._imageMimeType;
+            }
+            return result;
           } finally {
             setExecutingTool(null);
           }
@@ -191,8 +198,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       startVision((base64, mimeType) => {
         sessionRef.current?.sendImage(base64, mimeType);
       });
+      // Notify the model that vision is now active
+      sessionRef.current?.sendText("[SYSTEM] Vision mode activated. You will now receive periodic screenshots of the user's screen. Describe only what you actually see in the frames.");
     } else {
       stopVision();
+      // Notify the model that vision is disabled
+      if (sessionRef.current?.isConnected()) {
+        sessionRef.current?.sendText("[SYSTEM] Vision mode deactivated. You can no longer see the screen. Use captureScreenshot or getAccessibilitySnapshot tools if you need to inspect the page.");
+      }
     }
   }, []);
 
@@ -228,6 +241,26 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (!sessionRef.current?.isConnected()) return;
     sessionRef.current.sendText(text);
   }, []);
+
+  // Auto-reconnect on unexpected disconnect (not user-initiated)
+  const wasConnectedRef = useRef(false);
+  useEffect(() => {
+    if (state.status === "connected") {
+      wasConnectedRef.current = true;
+    }
+    if (state.status === "disconnected" && wasConnectedRef.current && state.closeCode !== undefined && state.closeCode !== 1000) {
+      // Unexpected disconnect — try to reconnect after a short delay
+      wasConnectedRef.current = false;
+      const timer = setTimeout(() => {
+        console.log("[Phantom] Auto-reconnecting after unexpected disconnect...");
+        connect().catch(() => {});
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+    if (state.status === "disconnected") {
+      wasConnectedRef.current = false;
+    }
+  }, [state.status, state.closeCode, connect]);
 
   useEffect(() => {
     return () => { sessionRef.current?.disconnect(); };

@@ -5,7 +5,7 @@
  * Minimal, dark.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Mic, Square, Settings, ChevronDown, Volume2, Eye, EyeOff } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
@@ -51,7 +51,7 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
   const isConnected = state.status === "connected";
   const isConnecting = state.status === "connecting";
 
-  const handleMicClick = async () => {
+  const handleMicClick = useCallback(async () => {
     if (!isConnected) {
       await connect();
       setTimeout(() => startListening(), 500);
@@ -60,7 +60,18 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
     } else {
       await startListening();
     }
-  };
+  }, [isConnected, state.isListening, connect, startListening, stopListening]);
+
+  // Listen for keyboard shortcut from background
+  useEffect(() => {
+    const listener = (message: { type: string }) => {
+      if (message.type === "toggle-listening") {
+        handleMicClick();
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, [handleMicClick]);
 
   const handleDisconnect = () => {
     disconnect();

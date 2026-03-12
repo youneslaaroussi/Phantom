@@ -39,6 +39,14 @@
     ],
     "side_panel": {
       "default_path": "sidepanel.html"
+    },
+    "commands": {
+      "toggle-listening": {
+        "suggested_key": {
+          "default": "Alt+P"
+        },
+        "description": "Toggle Phantom voice input"
+      }
     }
   }
 }
