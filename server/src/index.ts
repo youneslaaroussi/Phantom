@@ -10,7 +10,7 @@ import { handleContentAction } from "./content-actions.js";
 const app = new Hono();
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
-app.get("/health", (c) => c.json({ status: "ok" }));
+app.get("/health", (c) => c.json({ status: "ok", version: "0.2.0" }));
 
 // Computer Use sidecar endpoint
 app.post("/api/computer-use", async (c) => {
