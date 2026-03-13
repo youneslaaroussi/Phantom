@@ -4,6 +4,7 @@ import { VoiceScreen } from "./components/voice-screen";
 import { SettingsScreen } from "./components/settings-screen";
 import { SetupScreen } from "./components/setup-screen";
 import { TraceViewer } from "./components/trace-viewer";
+import { ToastProvider } from "./components/toast";
 import "./style.css";
 
 type Screen = "voice" | "settings" | "setup" | "loading" | "traces";
@@ -53,9 +54,11 @@ const SidePanel = () => {
 
   return (
     <div style={{ height: "100vh", width: "100%" }}>
-      <SessionProvider>
-        <App />
-      </SessionProvider>
+      <ToastProvider>
+        <SessionProvider>
+          <App />
+        </SessionProvider>
+      </ToastProvider>
     </div>
   );
 };

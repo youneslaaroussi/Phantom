@@ -103,10 +103,15 @@ export const WaveVisualizer = ({ inputLevel, outputLevel, isListening, isSpeakin
   const listeningRef = useRef(0);
   const speakingRef = useRef(0);
 
-  useEffect(() => { inputLevelRef.current = inputLevelRef.current * 0.7 + inputLevel * 0.3; }, [inputLevel]);
-  useEffect(() => { outputLevelRef.current = outputLevelRef.current * 0.7 + outputLevel * 0.3; }, [outputLevel]);
-  useEffect(() => { listeningRef.current = listeningRef.current * 0.85 + (isListening ? 1 : 0) * 0.15; }, [isListening]);
-  useEffect(() => { speakingRef.current = speakingRef.current * 0.85 + (isSpeaking ? 1 : 0) * 0.15; }, [isSpeaking]);
+  const targetInputRef = useRef(0);
+  const targetOutputRef = useRef(0);
+  const targetListeningRef = useRef(0);
+  const targetSpeakingRef = useRef(0);
+
+  targetInputRef.current = inputLevel;
+  targetOutputRef.current = outputLevel;
+  targetListeningRef.current = isListening ? 1 : 0;
+  targetSpeakingRef.current = isSpeaking ? 1 : 0;
 
   const initGL = useCallback(() => {
     const canvas = canvasRef.current;
@@ -148,6 +153,11 @@ export const WaveVisualizer = ({ inputLevel, outputLevel, isListening, isSpeakin
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(prog);
+
+    inputLevelRef.current += (targetInputRef.current - inputLevelRef.current) * 0.3;
+    outputLevelRef.current += (targetOutputRef.current - outputLevelRef.current) * 0.3;
+    listeningRef.current += (targetListeningRef.current - listeningRef.current) * 0.15;
+    speakingRef.current += (targetSpeakingRef.current - speakingRef.current) * 0.15;
 
     const t = (Date.now() - t0Ref.current) / 1000;
     gl.uniform1f(gl.getUniformLocation(prog, "u_time"), t);

@@ -44,3 +44,15 @@ export function playTyping() { play("typing", 0.15); }
 export function playScroll() { play("scroll", 0.15); }
 export function playSuccess() { play("success", 0.3); }
 export function startThinking(): () => void { return playLoop("thinking", 0.12); }
+export function playPersona(id: string) {
+  const name = `persona_${id}`;
+  try {
+    if (!cache[name]) {
+      cache[name] = new Audio(chrome.runtime.getURL(`assets/sfx/${name}.wav`));
+    }
+    const audio = cache[name];
+    audio.volume = 0.5;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  } catch {}
+}

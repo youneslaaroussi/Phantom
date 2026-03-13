@@ -115,6 +115,7 @@ export const TraceViewer = ({ onBack }: TraceViewerProps) => {
 const TraceEntryRow = ({ entry, baseTime }: { entry: TraceEntry; baseTime: number }) => {
   const [expanded, setExpanded] = useState(entry.type === "agent_text" || entry.type === "tool_call");
   const cfg = TYPE_CONFIG[entry.type];
+  if (!cfg) return null;
   const Icon = cfg.icon;
 
   if (entry.type === "vision_frame") {

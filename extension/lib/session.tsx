@@ -20,6 +20,8 @@ import React, {
 import { LiveSession } from "./live/client";
 import { getToolDeclarations, executeTool } from "./tools";
 import { getServerUrl } from "./connection-mode";
+import { startTabAudio, stopTabAudio, isTabAudioActive } from "./tab-audio";
+import { useToast } from "../components/toast";
 import { startVision, stopVision, isVisionActive } from "./vision";
 import { getSavedMicId } from "../components/mic-selector";
 import { startSession as startTrace, endSession as endTrace, addTrace } from "./trace";
@@ -79,15 +81,16 @@ interface SessionContextValue {
   setVoice: (v: LiveVoiceName) => void;
   persona: Persona;
   setPersonaId: (id: string) => void;
-  /** Whether vision (screen streaming) is enabled */
   visionEnabled: boolean;
-  /** Toggle vision on/off */
   setVisionEnabled: (enabled: boolean) => void;
+  tabAudioEnabled: boolean;
+  setTabAudioEnabled: (enabled: boolean) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
+  const { toast } = useToast();
   const sessionRef = useRef<LiveSession | null>(null);
   const [state, setState] = useState<LiveSessionState>({
     status: "disconnected",
@@ -101,6 +104,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [voice, setVoiceState] = useState<LiveVoiceName>("Kore");
   const [persona, setPersonaState] = useState<Persona>(getPersona("default"));
   const [visionEnabled, setVisionEnabledState] = useState(false);
+  const [tabAudioEnabled, setTabAudioEnabledState] = useState(false);
   const sessionTranscriptRef = useRef<string[]>([]);
   const sessionToolCallsRef = useRef<string[]>([]);
 
@@ -112,13 +116,29 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const setVoice = useCallback((v: LiveVoiceName) => {
-    setVoiceState(v);
-    if (sessionRef.current?.isConnected()) {
-      sessionRef.current.disconnect();
-      sessionRef.current = null;
+  const setTabAudioEnabled = useCallback(async (enabled: boolean) => {
+    setTabAudioEnabledState(enabled);
+    if (enabled && sessionRef.current?.isConnected()) {
+      addTrace("system", "Tab audio capture started");
+      try {
+        await startTabAudio((base64) => {
+          sessionRef.current?.sendAudioBase64(base64);
+        });
+        sessionRef.current?.sendText("[SYSTEM] You can now hear the audio playing in the user's browser tab. Listen and respond to what you hear.");
+      } catch (err) {
+        addTrace("error", `Tab audio failed: ${err instanceof Error ? err.message : String(err)}`);
+        toast("error", `Tab audio: ${err instanceof Error ? err.message : String(err)}`);
+        setTabAudioEnabledState(false);
+      }
+    } else {
+      addTrace("system", "Tab audio capture stopped");
+      await stopTabAudio();
+      if (sessionRef.current?.isConnected()) {
+        sessionRef.current?.sendText("[SYSTEM] Tab audio capture stopped. You can no longer hear the browser audio.");
+      }
     }
   }, []);
+
 
   const setPersonaId = useCallback(async (id: string) => {
     const p = getPersona(id);
@@ -183,6 +203,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           } catch (e) {
             stopThinking();
             playError();
+            toast("error", `Tool failed: ${e instanceof Error ? e.message : String(e)}`);
             throw e;
           } finally {
             setExecutingTool(null);
@@ -193,6 +214,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         onOutputLevel: setOutputLevel,
         onError: (err) => {
           addTrace("error", err instanceof Error ? err.message : String(err));
+          toast("error", err instanceof Error ? err.message : String(err));
           console.error("[Phantom] Session error:", err);
         },
       }
@@ -208,9 +230,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       await session.connect({ proxyUrl: wsUrl });
       addTrace("system", "Connected");
       playConnect();
+      toast("success", "Connected");
+      session.sendText("Say hi! Greet the user briefly in character. Keep it to one short sentence.");
     } catch (err) {
       addTrace("error", `Connect failed: ${err instanceof Error ? err.message : String(err)}`);
       playError();
+      toast("error", `Connection failed: ${err instanceof Error ? err.message : String(err)}`);
       console.error("[Phantom] Connect failed:", err);
     }
   }, [voice, visionEnabled, persona]);
@@ -220,6 +245,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     addTrace("system", "Disconnected");
     endTrace();
     stopVision();
+    stopTabAudio();
+    setTabAudioEnabledState(false);
 
     // Summarize session before cleanup (fire and forget)
     const transcript = sessionTranscriptRef.current.join("\n");
@@ -334,11 +361,13 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         inputLevel,
         outputLevel,
         voice,
-        setVoice,
+        setVoice: setVoiceState,
         persona,
         setPersonaId,
         visionEnabled,
         setVisionEnabled,
+        tabAudioEnabled,
+        setTabAudioEnabled,
       }}
     >
       {children}

@@ -33,7 +33,7 @@ export async function getAudioInputDevices(): Promise<AudioDevice[]> {
 export class AudioCapture {
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
-  private workletNode: AudioWorkletNode | null = null;
+  private scriptNode: ScriptProcessorNode | null = null;
   private analyserNode: AnalyserNode | null = null;
   private onAudioData: ((data: ArrayBuffer) => void) | null = null;
   private onAudioLevel: ((level: number) => void) | null = null;
@@ -66,30 +66,27 @@ export class AudioCapture {
     });
 
     this.audioContext = new AudioContext({ sampleRate: INPUT_SAMPLE_RATE });
-
-    await this.audioContext.audioWorklet.addModule(
-      this.createWorkletProcessorURL()
-    );
-
     const source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
     this.analyserNode = this.audioContext.createAnalyser();
     this.analyserNode.fftSize = 256;
     this.analyserNode.smoothingTimeConstant = 0.5;
 
-    this.workletNode = new AudioWorkletNode(
-      this.audioContext,
-      "pcm-processor"
-    );
-
-    this.workletNode.port.onmessage = (event) => {
-      if (this.onAudioData && event.data.pcmData) {
-        this.onAudioData(event.data.pcmData);
+    this.scriptNode = this.audioContext.createScriptProcessor(4096, 1, 1);
+    this.scriptNode.onaudioprocess = (e) => {
+      if (!this.onAudioData) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const pcm16 = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
+      this.onAudioData(pcm16.buffer);
     };
 
     source.connect(this.analyserNode);
-    this.analyserNode.connect(this.workletNode);
+    this.analyserNode.connect(this.scriptNode);
+    this.scriptNode.connect(this.audioContext.destination);
 
     if (this.onAudioLevel) {
       this.startLevelMonitoring();
@@ -122,9 +119,9 @@ export class AudioCapture {
       this.levelCheckInterval = null;
     }
 
-    if (this.workletNode) {
-      this.workletNode.disconnect();
-      this.workletNode = null;
+    if (this.scriptNode) {
+      this.scriptNode.disconnect();
+      this.scriptNode = null;
     }
 
     if (this.analyserNode) {
@@ -146,42 +143,6 @@ export class AudioCapture {
     this.onAudioLevel = null;
   }
 
-  private createWorkletProcessorURL(): string {
-    const processorCode = `
-      class PCMProcessor extends AudioWorkletProcessor {
-        constructor() {
-          super();
-          this.buffer = [];
-          this.bufferSize = ${CHUNK_SIZE};
-        }
-
-        process(inputs, outputs, parameters) {
-          const input = inputs[0];
-          if (!input || !input[0]) return true;
-
-          const samples = input[0];
-          
-          for (let i = 0; i < samples.length; i++) {
-            const s = Math.max(-1, Math.min(1, samples[i]));
-            this.buffer.push(s < 0 ? s * 0x8000 : s * 0x7FFF);
-          }
-
-          while (this.buffer.length >= this.bufferSize) {
-            const chunk = this.buffer.splice(0, this.bufferSize);
-            const int16Array = new Int16Array(chunk);
-            this.port.postMessage({ pcmData: int16Array.buffer }, [int16Array.buffer]);
-          }
-
-          return true;
-        }
-      }
-
-      registerProcessor('pcm-processor', PCMProcessor);
-    `;
-
-    const blob = new Blob([processorCode], { type: "application/javascript" });
-    return URL.createObjectURL(blob);
-  }
 }
 
 export class AudioPlayer {

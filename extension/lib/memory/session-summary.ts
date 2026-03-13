@@ -24,8 +24,9 @@ export async function summarizeSession(
 
   try {
     const serverUrl = await getServerUrl();
+    const httpUrl = serverUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
     const response = await fetch(
-      `${serverUrl.replace(/\/$/, "")}/api/summarize`,
+      `${httpUrl.replace(/\/$/, "")}/api/summarize`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

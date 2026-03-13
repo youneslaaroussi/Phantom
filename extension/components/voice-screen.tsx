@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Mic, Square, Settings, Eye, EyeOff, Terminal } from "lucide-react";
+import { Mic, Square, Settings, Eye, EyeOff, Terminal, Volume2, VolumeX } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
 import { MarkdownText } from "./markdown";
@@ -37,6 +37,8 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
     hasApiKey,
     visionEnabled,
     setVisionEnabled,
+    tabAudioEnabled,
+    setTabAudioEnabled,
   } = useSession();
 
   const [textInput, setTextInput] = useState("");
@@ -104,6 +106,20 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
             {visionEnabled
               ? <Eye className="w-4 h-4" />
               : <EyeOff className="w-4 h-4" />
+            }
+          </button>
+          <button
+            onClick={() => setTabAudioEnabled(!tabAudioEnabled)}
+            className={`p-1.5 rounded-lg transition-colors ${
+              tabAudioEnabled
+                ? "bg-purple-500/20 text-purple-400"
+                : "hover:bg-white/5 text-gray-500"
+            }`}
+            title={tabAudioEnabled ? "Tab audio on — Phantom can hear the page" : "Tab audio off"}
+          >
+            {tabAudioEnabled
+              ? <Volume2 className="w-4 h-4" />
+              : <VolumeX className="w-4 h-4" />
             }
           </button>
           <button
@@ -218,10 +234,10 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
       {isConnected && (
         <div className="absolute bottom-0 left-0 right-0 h-52 overflow-hidden pointer-events-none z-10">
           <WaveVisualizer
-            inputLevel={state.isListening ? inputLevel : 0}
-            outputLevel={state.isSpeaking ? outputLevel : 0.02}
+            inputLevel={inputLevel}
+            outputLevel={outputLevel}
             isListening={state.isListening}
-            isSpeaking={state.isSpeaking}
+            isSpeaking={state.isSpeaking || outputLevel > 0.01}
             className="w-full h-full"
           />
         </div>

@@ -33,39 +33,39 @@ function getFolder(personaId: string, state: string): string {
 
 export const AnimatedMascot = ({ state, personaId = "default", size = 64, className = "" }: AnimatedMascotProps) => {
   const [frame, setFrame] = useState(1);
-  const [frameCount, setFrameCount] = useState(4);
+  const frameCountRef = useRef(4);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const folder = getFolder(personaId, state);
   const fps = FPS[state] || 3;
 
   useEffect(() => {
-    let count = 1;
-    const probe = async () => {
-      for (let i = 1; i <= 20; i++) {
+    let cancelled = false;
+    (async () => {
+      let count = 1;
+      for (let i = 1; i <= 10; i++) {
         try {
           const url = chrome.runtime.getURL(`assets/${folder}/${i}.png`);
           const resp = await fetch(url, { method: "HEAD" });
           if (resp.ok) count = i;
           else break;
-        } catch {
-          break;
-        }
+        } catch { break; }
       }
-      setFrameCount(count);
-      setFrame(1);
-    };
-    probe();
+      if (!cancelled) {
+        frameCountRef.current = count;
+        setFrame(1);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [folder]);
 
   useEffect(() => {
-    if (frameCount < 1) return;
     setFrame(1);
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
-      setFrame((f) => (f % frameCount) + 1);
+      setFrame((f) => (f % frameCountRef.current) + 1);
     }, 1000 / fps);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [state, personaId, frameCount, fps]);
+  }, [state, personaId, fps]);
 
   const src = chrome.runtime.getURL(`assets/${folder}/${frame}.png`);
 

@@ -314,6 +314,21 @@ export class LiveSession {
     this.ws.send(JSON.stringify(message));
   }
 
+  sendAudioBase64(base64Data: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    const message = {
+      realtimeInput: {
+        audio: {
+          data: base64Data,
+          mimeType: "audio/pcm;rate=16000",
+        },
+      },
+    };
+
+    this.ws.send(JSON.stringify(message));
+  }
+
   sendText(text: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("Not connected");
