@@ -6,24 +6,13 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Mic, Square, Settings, ChevronDown, Volume2, Eye, EyeOff, Terminal } from "lucide-react";
+import { Mic, Square, Settings, Eye, EyeOff, Terminal } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
 import { MarkdownText } from "./markdown";
 import { AnimatedMascot } from "./animated-mascot";
 import { getConnectionMode, type ConnectionMode } from "../lib/connection-mode";
 import type { LiveVoiceName } from "../lib/live/types";
-
-const VOICES: { id: LiveVoiceName; label: string; desc: string }[] = [
-  { id: "Puck", label: "Puck", desc: "Upbeat" },
-  { id: "Charon", label: "Charon", desc: "Informative" },
-  { id: "Kore", label: "Kore", desc: "Warm" },
-  { id: "Fenrir", label: "Fenrir", desc: "Excitable" },
-  { id: "Aoede", label: "Aoede", desc: "Breezy" },
-  { id: "Leda", label: "Leda", desc: "Youthful" },
-  { id: "Orus", label: "Orus", desc: "Firm" },
-  { id: "Zephyr", label: "Zephyr", desc: "Bright" },
-];
 
 interface VoiceScreenProps {
   onOpenSettings: () => void;
@@ -44,13 +33,14 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
     outputLevel,
     voice,
     setVoice,
+    persona,
     hasApiKey,
     visionEnabled,
     setVisionEnabled,
   } = useSession();
 
   const [textInput, setTextInput] = useState("");
-  const [showVoiceSelector, setShowVoiceSelector] = useState(false);
+
   const [connectionMode, setConnectionMode] = useState<ConnectionMode | null>(null);
 
   useEffect(() => {
@@ -111,8 +101,8 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
       {/* Header */}
       <div className="relative z-20 flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          <img src={chrome.runtime.getURL("assets/mascot.png")} alt="" className="w-5 h-5" style={{ imageRendering: "pixelated" as const }} />
-          <span className="font-mono text-xs tracking-widest text-gray-500">PHANTOM</span>
+          <img src={chrome.runtime.getURL("assets/" + persona.image)} alt="" className="w-5 h-5" style={{ imageRendering: "pixelated" as const }} />
+          <span className="font-mono text-xs tracking-widest text-gray-500">{persona.name.toUpperCase()}</span>
           {connectionMode && (
             <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded ${
               connectionMode === "hosted"
@@ -258,43 +248,8 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
         </div>
       )}
 
-      {/* Bottom bar — voice selector + text input */}
-      <div className="relative z-20 border-t border-gray-900 px-4 py-3 space-y-3">
-        {/* Voice selector */}
-        {!state.isListening && (
-          <div className="flex justify-center">
-            <div className="relative">
-              <button
-                onClick={() => setShowVoiceSelector(!showVoiceSelector)}
-                disabled={isConnected}
-                className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title={isConnected ? "Disconnect to change voice" : "Select voice"}
-              >
-                <Volume2 className="w-3 h-3" />
-                <span>{voice}</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${showVoiceSelector ? "rotate-180" : ""}`} />
-              </button>
-
-              {showVoiceSelector && !isConnected && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 border border-gray-800 rounded-lg shadow-xl py-1 min-w-[140px] max-h-[200px] overflow-y-auto z-30">
-                  {VOICES.map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => { setVoice(v.id); setShowVoiceSelector(false); }}
-                      className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-800 transition-colors flex justify-between ${
-                        v.id === voice ? "text-blue-400" : "text-gray-300"
-                      }`}
-                    >
-                      <span>{v.label}</span>
-                      <span className="text-gray-600 text-[10px]">{v.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
+      {/* Bottom bar */}
+      <div className="relative z-20 px-4 py-3 space-y-3" style={{ borderTop: "1px solid rgba(99,102,241,0.1)" }}>
         {/* Text input */}
         <form onSubmit={handleTextSubmit} className="flex gap-2">
           <input

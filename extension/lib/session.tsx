@@ -25,27 +25,20 @@ import { startVision, stopVision, isVisionActive } from "./vision";
 import { getSavedMicId } from "../components/mic-selector";
 import { startSession as startTrace, endSession as endTrace, addTrace } from "./trace";
 import { playConnect, playDisconnect, playToolStart, playToolEnd, playError, playListenStart, playListenStop, playVisionOn, playVisionOff, playWake, startThinking } from "./sounds";
+import { getSavedPersonaId, savePersonaId, getPersona, type Persona } from "./personas";
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
 
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
-const VOICE_KEY = "phantom_voice";
 
-const SYSTEM_INSTRUCTION_BASE = `You are Phantom — a small, curious AI spirit that lives in the user's browser. You're like a helpful little wisp: friendly, playful, and eager to help.
-
-You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.
-
-Personality:
-- You're a tiny companion, not a corporate assistant. Be warm and brief.
-- Show curiosity — "ooh let me check that" or "hmm interesting page"
-- Be casual but competent. You're a friend who happens to be really good at browsers.
-- When you succeed, be subtly happy about it. When you fail, be honest and try again.
-- Keep responses SHORT — the user is listening, not reading. 1-2 sentences max unless they ask for detail.
+const TOOL_GUIDELINES = `
 
 Guidelines:
 - When asked to do something on a page, use getAccessibilitySnapshot first to understand the layout
 - After clicking or filling, briefly confirm what you did
 - If something fails, explain what went wrong and try an alternative approach
-- Don't read long text aloud — summarize it instead`;
+- Don't read long text aloud — summarize it instead
+- Keep responses SHORT — the user is listening, not reading. 1-2 sentences max unless they ask for detail.
+- You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.`;
 
 const VISION_ON_ADDENDUM = `
 
@@ -76,6 +69,8 @@ interface SessionContextValue {
   outputLevel: number;
   voice: LiveVoiceName;
   setVoice: (v: LiveVoiceName) => void;
+  persona: Persona;
+  setPersonaId: (id: string) => void;
   hasApiKey: boolean;
   checkApiKey: () => Promise<boolean>;
   /** Whether vision (screen streaming) is enabled */
@@ -98,13 +93,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [inputLevel, setInputLevel] = useState(0);
   const [outputLevel, setOutputLevel] = useState(0);
   const [voice, setVoiceState] = useState<LiveVoiceName>("Kore");
+  const [persona, setPersonaState] = useState<Persona>(getPersona("default"));
   const [hasApiKey, setHasApiKey] = useState(false);
   const [connectionMode, setConnectionModeState] = useState<ConnectionMode>("byok");
   const [visionEnabled, setVisionEnabledState] = useState(false);
 
   useEffect(() => {
-    chrome.storage.local.get(VOICE_KEY, (r) => {
-      if (r[VOICE_KEY]) setVoiceState(r[VOICE_KEY]);
+    getSavedPersonaId().then((id) => {
+      const p = getPersona(id);
+      setPersonaState(p);
+      setVoiceState(p.voice);
     });
     getApiKey().then((k) => setHasApiKey(!!k));
     getConnectionMode().then(setConnectionModeState);
@@ -112,7 +110,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const setVoice = useCallback((v: LiveVoiceName) => {
     setVoiceState(v);
-    chrome.storage.local.set({ [VOICE_KEY]: v });
+    if (sessionRef.current?.isConnected()) {
+      sessionRef.current.disconnect();
+      sessionRef.current = null;
+    }
+  }, []);
+
+  const setPersonaId = useCallback(async (id: string) => {
+    const p = getPersona(id);
+    setPersonaState(p);
+    setVoiceState(p.voice);
+    await savePersonaId(id);
     if (sessionRef.current?.isConnected()) {
       sessionRef.current.disconnect();
       sessionRef.current = null;
@@ -144,7 +152,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const session = new LiveSession(
       {
         model: MODEL,
-        systemInstruction: SYSTEM_INSTRUCTION_BASE + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
+        systemInstruction: persona.prompt + TOOL_GUIDELINES + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
         tools,
         responseModalities: ["AUDIO"],
         voice,
@@ -204,7 +212,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       playError();
       console.error("[Phantom] Connect failed:", err);
     }
-  }, [voice, visionEnabled]);
+  }, [voice, visionEnabled, persona]);
 
   const disconnect = useCallback(() => {
     playDisconnect();
@@ -315,6 +323,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         outputLevel,
         voice,
         setVoice,
+        persona,
+        setPersonaId,
         hasApiKey,
         checkApiKey,
         visionEnabled,
