@@ -355,9 +355,9 @@
     </div>
     <div class="nav-links">
       <a href="https://github.com/youneslaaroussi/phantom" class="nav-link-secondary">GitHub</a>
-      <a href="#install" class="nav-link-primary">
-        Install
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      <a id="nav-download-btn" href="#install" class="nav-link-primary">
+        Download
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
       </a>
     </div>
   </nav>
@@ -472,9 +472,9 @@
       <h2>Say hi to Phantom.</h2>
       <p>Get started in 30 seconds. Grab an API key, install the extension, and talk.</p>
       <div class="cta-buttons">
-        <a href="https://github.com/youneslaaroussi/phantom" class="btn-primary">
-          Install from GitHub
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <a id="download-btn" href="https://github.com/youneslaaroussi/Phantom/releases/latest" class="btn-primary">
+          Download Extension
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
         </a>
         <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" class="btn-outline">
           Get a free API key
@@ -492,6 +492,27 @@
   </div>
 
   <script>lucide.createIcons();</script>
+  <script>
+    // Fetch latest release download URL from GitHub
+    (function() {
+      var REPO = 'youneslaaroussi/Phantom';
+      var API = 'https://api.github.com/repos/' + REPO + '/releases/latest';
+      var btn = document.getElementById('download-btn');
+
+      fetch(API)
+        .then(function(r) { return r.json(); })
+        .then(function(release) {
+          if (!release || !release.assets) return;
+          var zip = release.assets.find(function(a) { return a.name.endsWith('.zip'); });
+          if (zip) {
+            btn.href = zip.browser_download_url;
+            btn.textContent = '';
+            btn.innerHTML = 'Download ' + release.tag_name + ' <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
+          }
+        })
+        .catch(function() {});
+    })();
+  </script>
   <script>
     (function() {
       var canvas = document.getElementById('glow-bg');
