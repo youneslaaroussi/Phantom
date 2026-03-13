@@ -47,6 +47,12 @@
         },
         "description": "Toggle Phantom voice input"
       }
-    }
+    },
+    "web_accessible_resources": [
+      {
+        "resources": ["assets/*"],
+        "matches": ["<all_urls>"]
+      }
+    ]
   }
 }

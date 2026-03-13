@@ -8,6 +8,7 @@
  */
 
 import type { LiveToolDeclaration } from "./live/types";
+import { playNavigate, playScroll, playHighlight, playTyping, playSuccess } from "./sounds";
 
 export interface ToolResult {
   success: boolean;
@@ -184,6 +185,7 @@ async function executeToolInternal(
     case "openTab": {
       const url = args.url as string;
       const newTab = args.newTab !== false;
+      playNavigate();
       if (newTab) {
         await chrome.tabs.create({ url });
       } else {
@@ -284,6 +286,7 @@ async function executeToolInternal(
     }
 
     case "typeInto": {
+      playTyping();
       const selector = args.selector as string;
       const value = args.value as string;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -323,6 +326,7 @@ async function executeToolInternal(
     }
 
     case "scrollDown": {
+      playScroll();
       const pixels = (args.pixels as number) || 500;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
@@ -335,6 +339,7 @@ async function executeToolInternal(
     }
 
     case "scrollUp": {
+      playScroll();
       const pixels = (args.pixels as number) || 500;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
@@ -381,6 +386,7 @@ async function executeToolInternal(
     }
 
     case "highlight": {
+      playHighlight();
       const selector = args.selector as string;
       const label = (args.label as string) || "";
       const duration = (args.duration as number) || 3000;

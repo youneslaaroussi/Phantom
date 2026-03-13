@@ -24,6 +24,7 @@ import { getConnectionMode, getServerUrl, type ConnectionMode } from "./connecti
 import { startVision, stopVision, isVisionActive } from "./vision";
 import { getSavedMicId } from "../components/mic-selector";
 import { startSession as startTrace, endSession as endTrace, addTrace } from "./trace";
+import { playConnect, playDisconnect, playToolStart, playToolEnd, playError, playListenStart, playListenStop, playVisionOn, playVisionOff, playWake, startThinking } from "./sounds";
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
 
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
@@ -156,11 +157,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         },
         onToolCall: async (tc) => {
           addTrace("tool_call", tc.name, { args: tc.args });
+          playToolStart();
+          const stopThinking = startThinking();
           setExecutingTool(tc.name);
           try {
             const result = await executeTool(tc.name, tc.args);
             addTrace("tool_result", JSON.stringify(result).slice(0, 500));
+            stopThinking();
+            playToolEnd();
             return result;
+          } catch (e) {
+            stopThinking();
+            playError();
+            throw e;
           } finally {
             setExecutingTool(null);
           }
@@ -189,13 +198,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setHasApiKey(true);
       }
       addTrace("system", "Connected");
+      playConnect();
     } catch (err) {
       addTrace("error", `Connect failed: ${err instanceof Error ? err.message : String(err)}`);
+      playError();
       console.error("[Phantom] Connect failed:", err);
     }
   }, [voice, visionEnabled]);
 
   const disconnect = useCallback(() => {
+    playDisconnect();
     addTrace("system", "Disconnected");
     endTrace();
     stopVision();
@@ -211,6 +223,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const setVisionEnabled = useCallback((enabled: boolean) => {
     setVisionEnabledState(enabled);
     if (enabled && sessionRef.current?.isConnected()) {
+      playVisionOn();
       addTrace("system", "Vision enabled");
       startVision((base64, mimeType) => {
         addTrace("vision_frame", "frame sent");
@@ -218,6 +231,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       });
       sessionRef.current?.sendText("[SYSTEM] You can now see the user's screen. You'll receive a live view updated every second. Describe only what you actually see.");
     } else {
+      playVisionOff();
       addTrace("system", "Vision disabled");
       stopVision();
       if (sessionRef.current?.isConnected()) {
@@ -243,6 +257,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       await new Promise((r) => setTimeout(r, 500));
     }
     const micId = deviceId || await getSavedMicId();
+    playListenStart();
     await sessionRef.current?.startListening({
       deviceId: micId,
       onAudioLevel: setInputLevel,
@@ -250,6 +265,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [connect]);
 
   const stopListening = useCallback(() => {
+    playListenStop();
     sessionRef.current?.stopListening();
     setInputLevel(0);
   }, []);
