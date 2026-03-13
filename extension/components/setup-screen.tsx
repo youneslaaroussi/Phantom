@@ -1,21 +1,26 @@
-import React, { useState, useEffect } from "react";
-import { Mic, ChevronRight, ChevronLeft } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Mic, ChevronRight, ChevronLeft, Brain, CheckCircle, Loader2, Shield } from "lucide-react";
 import { useSession } from "../lib/session";
 import { MicSelector } from "./mic-selector";
-import { playWake, playConnect } from "../lib/sounds";
+import { playWake, playConnect, playSuccess } from "../lib/sounds";
 import { PERSONAS, savePersonaId, type Persona } from "../lib/personas";
+import { loadEmbeddingModel, isModelReady, type ProgressCallback } from "../lib/memory";
 
 interface SetupScreenProps {
   onComplete: () => void;
 }
 
-type Step = "meet" | "persona" | "mic";
-const STEPS: Step[] = ["meet", "persona", "mic"];
+type Step = "meet" | "persona" | "permissions" | "mic";
+const STEPS: Step[] = ["meet", "persona", "permissions", "mic"];
 
 export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
   const { setPersonaId } = useSession();
   const [step, setStep] = useState<Step>("meet");
   const [selectedPersona, setSelectedPersona] = useState<Persona>(PERSONAS[0]);
+  const [embeddingProgress, setEmbeddingProgress] = useState(0);
+  const [embeddingReady, setEmbeddingReady] = useState(false);
+  const [embeddingLoading, setEmbeddingLoading] = useState(false);
+  const [micGranted, setMicGranted] = useState(false);
 
   useEffect(() => { playWake(); }, []);
 
@@ -128,11 +133,142 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
               <ChevronLeft className="w-3.5 h-3.5" /> Back
             </button>
             <button
-              onClick={() => setStep("mic")}
+              onClick={() => setStep("permissions")}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-sm transition-all"
               style={{ background: "#67e8f9", color: "#0a0a12" }}
             >
               Next
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {dots}
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "permissions") {
+    const handleRequestMic = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+        setMicGranted(true);
+      } catch {
+        setMicGranted(false);
+      }
+    };
+
+    const handleDownloadModel = async () => {
+      if (embeddingReady || embeddingLoading) return;
+      setEmbeddingLoading(true);
+      try {
+        const onProgress: ProgressCallback = (p) => {
+          if (p.status === "progress" && p.progress) {
+            setEmbeddingProgress(Math.round(p.progress));
+          }
+        };
+        await loadEmbeddingModel(onProgress);
+        setEmbeddingReady(true);
+        setEmbeddingProgress(100);
+        playSuccess();
+      } catch (err) {
+        console.error("Embedding model download failed:", err);
+      } finally {
+        setEmbeddingLoading(false);
+      }
+    };
+
+    // Auto-start model download when entering this step
+    useEffect(() => {
+      if (step === "permissions" && !embeddingReady && !embeddingLoading) {
+        handleDownloadModel();
+      }
+    }, [step]);
+
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center px-8" style={{ background: "#0a0a12", color: "#e2e8f0" }}>
+        <div className="max-w-sm w-full flex flex-col items-center text-center space-y-6">
+          <div className="p-4 rounded-full" style={{ background: "rgba(103,232,249,0.1)" }}>
+            <Shield className="w-8 h-8" style={{ color: "#67e8f9" }} />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-lg font-bold tracking-tight">Setting things up</h1>
+            <p className="text-xs" style={{ color: "#64748b" }}>
+              {selectedPersona.name} needs a couple of things to work properly.
+            </p>
+          </div>
+
+          <div className="w-full space-y-3">
+            {/* Microphone permission */}
+            <div className="w-full rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(30,27,75,0.3)", border: "1px solid rgba(99,102,241,0.15)" }}>
+              <div className="flex items-center gap-3">
+                <Mic className="w-4 h-4" style={{ color: micGranted ? "#4ade80" : "#64748b" }} />
+                <div className="text-left">
+                  <div className="text-xs font-medium">Microphone</div>
+                  <div className="text-[10px]" style={{ color: "#64748b" }}>For voice conversations</div>
+                </div>
+              </div>
+              {micGranted ? (
+                <CheckCircle className="w-4 h-4" style={{ color: "#4ade80" }} />
+              ) : (
+                <button
+                  onClick={handleRequestMic}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all"
+                  style={{ background: "#67e8f9", color: "#0a0a12" }}
+                >
+                  Allow
+                </button>
+              )}
+            </div>
+
+            {/* Embedding model download */}
+            <div className="w-full rounded-xl p-3" style={{ background: "rgba(30,27,75,0.3)", border: "1px solid rgba(99,102,241,0.15)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <Brain className="w-4 h-4" style={{ color: embeddingReady ? "#4ade80" : "#64748b" }} />
+                  <div className="text-left">
+                    <div className="text-xs font-medium">Memory Model</div>
+                    <div className="text-[10px]" style={{ color: "#64748b" }}>
+                      {embeddingReady ? "Ready — memories will persist across sessions" : "Downloads ~30MB for local semantic memory"}
+                    </div>
+                  </div>
+                </div>
+                {embeddingReady ? (
+                  <CheckCircle className="w-4 h-4" style={{ color: "#4ade80" }} />
+                ) : embeddingLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#67e8f9" }} />
+                ) : null}
+              </div>
+              {embeddingLoading && !embeddingReady && (
+                <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ background: "rgba(99,102,241,0.2)" }}>
+                  <div
+                    className="h-full transition-all duration-300"
+                    style={{
+                      width: `${embeddingProgress}%`,
+                      background: "#67e8f9",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setStep("persona")}
+              className="flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs transition-all"
+              style={{ color: "#64748b" }}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Back
+            </button>
+            <button
+              onClick={() => setStep("mic")}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-40"
+              style={{ background: "#67e8f9", color: "#0a0a12" }}
+            >
+              {embeddingReady ? "Next" : "Skip for now"}
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

@@ -10,6 +10,14 @@
 import type { LiveToolDeclaration } from "./live/types";
 import { playNavigate, playScroll, playHighlight, playTyping, playSuccess } from "./sounds";
 import { executeComputerAction } from "./computer-use";
+import { executeContentAction, type ContentActionType } from "./content-actions";
+import {
+  addMemory,
+  searchMemories,
+  addProfileFact,
+  addProfilePreference,
+  updateUserProfile,
+} from "./memory";
 
 export interface ToolResult {
   success: boolean;
@@ -160,6 +168,54 @@ export function getToolDeclarations(): LiveToolDeclaration[] {
             task: { type: "string", description: "What to do, described in natural language. Be specific about what to click, where to type, etc. Example: 'Click the blue Submit button in the bottom right', 'Click the play button on the video', 'Drag the slider to 75%'" },
           },
           required: ["task"],
+        },
+      },
+      {
+        name: "contentAction",
+        description: "Highlight content on the page and show an AI-generated summary, rewrite, explanation, translation, or simplification in a popup. Use when the user asks you to summarize a paragraph, explain a section, simplify jargon, rewrite text, or translate content they're looking at.",
+        parameters: {
+          type: "object",
+          properties: {
+            selector: { type: "string", description: "CSS selector of the content to process" },
+            action: { type: "string", description: "One of: summarize, rewrite, explain, translate, simplify" },
+            instruction: { type: "string", description: "Optional extra instruction, e.g. 'make it more casual' or 'translate to Spanish'" },
+          },
+          required: ["selector", "action"],
+        },
+      },
+      {
+        name: "rememberThis",
+        description: "Save something to long-term memory. Use when the user explicitly asks you to remember something, or when you learn an important fact about them (name, preferences, habits, important dates).",
+        parameters: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "What to remember" },
+            type: { type: "string", description: "'explicit' for user-requested memories, 'fact' for things you infer about the user" },
+          },
+          required: ["text"],
+        },
+      },
+      {
+        name: "recallMemory",
+        description: "Search your memory for relevant past information. Use when the user asks 'do you remember...', references something from a past session, or when context from previous sessions would help you answer better.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "What to search for in memory" },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "updateUserProfile",
+        description: "Update what you know about the user — their name, preferences, or facts. Use when you learn something durable about them.",
+        parameters: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "User's name" },
+            fact: { type: "string", description: "A fact about the user to store" },
+            preference: { type: "string", description: "A preference to store" },
+          },
         },
       },
     ],
@@ -441,6 +497,62 @@ async function executeToolInternal(
       return {
         success: result.success,
         result: result.result,
+      };
+    }
+
+    case "contentAction": {
+      const selector = args.selector as string;
+      const action = args.action as ContentActionType;
+      const instruction = args.instruction as string | undefined;
+      const result = await executeContentAction(selector, action, instruction);
+      return {
+        success: result.success,
+        result: result.result || result.error,
+      };
+    }
+
+    case "rememberThis": {
+      const text = args.text as string;
+      const type = (args.type as string) === "fact" ? "fact" : "explicit";
+      await addMemory(text, type as any);
+      return { success: true, result: `Remembered: "${text}"` };
+    }
+
+    case "recallMemory": {
+      const query = args.query as string;
+      const results = await searchMemories(query, 5);
+      if (results.length === 0) {
+        return { success: true, result: "No relevant memories found." };
+      }
+      const formatted = results
+        .map((r) => {
+          const date = new Date(r.entry.timestamp).toLocaleDateString();
+          return `[${date}, ${(r.similarity * 100).toFixed(0)}% match] ${r.entry.text}`;
+        })
+        .join("\n");
+      return { success: true, result: formatted };
+    }
+
+    case "updateUserProfile": {
+      const name = args.name as string | undefined;
+      const fact = args.fact as string | undefined;
+      const preference = args.preference as string | undefined;
+      const updates: string[] = [];
+      if (name) {
+        await updateUserProfile({ name });
+        updates.push(`name → ${name}`);
+      }
+      if (fact) {
+        await addProfileFact(fact);
+        updates.push(`fact: ${fact}`);
+      }
+      if (preference) {
+        await addProfilePreference(preference);
+        updates.push(`preference: ${preference}`);
+      }
+      return {
+        success: true,
+        result: `Profile updated: ${updates.join(", ")}`,
       };
     }
 

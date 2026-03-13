@@ -4,6 +4,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { createGeminiProxy } from "./proxy.js";
 import { handleComputerUse } from "./computer-use.js";
+import { handleSummarize } from "./summarize.js";
+import { handleContentAction } from "./content-actions.js";
 
 const app = new Hono();
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
@@ -19,6 +21,30 @@ app.post("/api/computer-use", async (c) => {
   } catch (err: any) {
     console.error("[api] computer-use error:", err);
     return c.json({ success: false, actions: [], error: err.message }, 500);
+  }
+});
+
+// Session summarization endpoint
+app.post("/api/summarize", async (c) => {
+  try {
+    const body = await c.req.json();
+    const result = await handleSummarize(body);
+    return c.json(result);
+  } catch (err: any) {
+    console.error("[api] summarize error:", err);
+    return c.json({ summary: "" }, 500);
+  }
+});
+
+// Content action endpoint (summarize, rewrite, explain, etc.)
+app.post("/api/content-action", async (c) => {
+  try {
+    const body = await c.req.json();
+    const result = await handleContentAction(body);
+    return c.json(result);
+  } catch (err: any) {
+    console.error("[api] content-action error:", err);
+    return c.json({ result: `Error: ${err.message}` }, 500);
   }
 });
 

@@ -26,6 +26,7 @@ import { startSession as startTrace, endSession as endTrace, addTrace } from "./
 import { playConnect, playDisconnect, playToolStart, playToolEnd, playError, playListenStart, playListenStop, playVisionOn, playVisionOff, playWake, startThinking } from "./sounds";
 import { getSavedPersonaId, savePersonaId, getPersona, type Persona } from "./personas";
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
+import { buildMemoryContext, summarizeSession } from "./memory/index";
 
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 
@@ -40,7 +41,12 @@ Guidelines:
 - You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.
 - For most web interactions, use clickOn/typeInto with CSS selectors — it's faster and more reliable.
 - Use computerAction (AI vision clicking) when CSS selectors won't work: canvas elements, complex UIs, iframes, images, video players, or when you can see something on screen but can't find a selector for it.
-- computerAction takes a screenshot, uses AI vision to find coordinates, and clicks/types at exact positions.`;
+- computerAction takes a screenshot, uses AI vision to find coordinates, and clicks/types at exact positions.
+- Use contentAction to highlight text on the page and show a popup with a summary, rewrite, explanation, translation, or simplified version.
+- You have memory! Use rememberThis when the user asks you to remember something or when you learn important facts about them.
+- Use recallMemory when the user references past sessions or says "do you remember...".
+- Use updateUserProfile to store the user's name, preferences, and durable facts about them.
+- If the user tells you their name, store it immediately with updateUserProfile.`;
 
 const VISION_ON_ADDENDUM = `
 
@@ -95,6 +101,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [voice, setVoiceState] = useState<LiveVoiceName>("Kore");
   const [persona, setPersonaState] = useState<Persona>(getPersona("default"));
   const [visionEnabled, setVisionEnabledState] = useState(false);
+  const sessionTranscriptRef = useRef<string[]>([]);
+  const sessionToolCallsRef = useRef<string[]>([]);
 
   useEffect(() => {
     getSavedPersonaId().then((id) => {
@@ -131,10 +139,22 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const tools = getToolDeclarations();
 
+    // Reset session tracking
+    sessionTranscriptRef.current = [];
+    sessionToolCallsRef.current = [];
+
+    // Build memory context to inject into system prompt
+    let memoryContext = "";
+    try {
+      memoryContext = await buildMemoryContext();
+    } catch (err) {
+      console.warn("[Phantom] Failed to build memory context:", err);
+    }
+
     const session = new LiveSession(
       {
         model: MODEL,
-        systemInstruction: persona.prompt + TOOL_GUIDELINES + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
+        systemInstruction: persona.prompt + TOOL_GUIDELINES + memoryContext + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
         tools,
         responseModalities: ["AUDIO"],
         voice,
@@ -143,10 +163,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         onStateChange: setState,
         onTranscript: (text) => {
           setTranscript(text);
-          if (text) addTrace("agent_text", text);
+          if (text) {
+            addTrace("agent_text", text);
+            sessionTranscriptRef.current.push(`Agent: ${text}`);
+          }
         },
         onToolCall: async (tc) => {
           addTrace("tool_call", tc.name, { args: tc.args });
+          sessionToolCallsRef.current.push(tc.name);
           playToolStart();
           const stopThinking = startThinking();
           setExecutingTool(tc.name);
@@ -196,6 +220,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     addTrace("system", "Disconnected");
     endTrace();
     stopVision();
+
+    // Summarize session before cleanup (fire and forget)
+    const transcript = sessionTranscriptRef.current.join("\n");
+    const toolCalls = [...sessionToolCallsRef.current];
+    if (transcript.length > 20) {
+      summarizeSession(transcript, toolCalls).catch((err) =>
+        console.warn("[Phantom] Session summary failed:", err)
+      );
+    }
+
     sessionRef.current?.disconnect();
     sessionRef.current = null;
     setTranscript("");
@@ -258,6 +292,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const sendText = useCallback((text: string) => {
     if (!sessionRef.current?.isConnected()) return;
     addTrace("user_text", text);
+    sessionTranscriptRef.current.push(`User: ${text}`);
     sessionRef.current.sendText(text);
   }, []);
 
