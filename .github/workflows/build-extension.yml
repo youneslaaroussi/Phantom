@@ -1,0 +1,91 @@
+name: Build & Release Extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "extension/**"
+      - ".github/workflows/build-extension.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Release Chrome Extension
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install dependencies
+        working-directory: extension
+        run: npm ci
+
+      - name: Build extension
+        working-directory: extension
+        run: npm run build
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -e "console.log(require('./extension/package.json').version)")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Package extension zip
+        run: |
+          cd extension/build/chrome-mv3-prod
+          zip -r ../../../phantom-chrome-v${{ steps.version.outputs.version }}.zip . -x "*.DS_Store"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phantom-chrome-v${{ steps.version.outputs.version }}
+          path: phantom-chrome-v${{ steps.version.outputs.version }}.zip
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP="phantom-chrome-v${VERSION}.zip"
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+
+          if gh release view "${TAG}" &>/dev/null; then
+            echo "Release ${TAG} exists — uploading new asset..."
+            gh release upload "${TAG}" "${ZIP}" --clobber
+          else
+            echo "Creating release ${TAG}..."
+            gh release create "${TAG}" "${ZIP}" \
+              --title "Phantom ${TAG}" \
+              --notes "## Phantom ${TAG}
+
+          AI voice agent for Chrome — talk to your browser, it does the rest.
+
+          ### Install
+          1. Download \`phantom-chrome-v${VERSION}.zip\`
+          2. Unzip it
+          3. Go to \`chrome://extensions\`, enable Developer Mode
+          4. Click **Load unpacked** and select the unzipped folder
+          5. Click the Phantom icon in the toolbar
+
+          ### Changes
+          ${COMMIT_MSG}"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## 📦 Extension built" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release:** https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
