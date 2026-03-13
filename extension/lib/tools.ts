@@ -9,6 +9,7 @@
 
 import type { LiveToolDeclaration } from "./live/types";
 import { playNavigate, playScroll, playHighlight, playTyping, playSuccess } from "./sounds";
+import { executeComputerAction } from "./computer-use";
 
 export interface ToolResult {
   success: boolean;
@@ -148,6 +149,17 @@ export function getToolDeclarations(): LiveToolDeclaration[] {
             duration: { type: "number", description: "How long to show it in milliseconds (default: 3000)" },
           },
           required: ["selector"],
+        },
+      },
+      {
+        name: "computerAction",
+        description: "Use AI vision to interact with the screen by clicking at coordinates, typing, scrolling, or dragging. Use this when CSS selectors won't work — for canvas elements, complex UIs, iframes, or when you can see something on screen but can't find a selector for it. Describe what you want to do in natural language.",
+        parameters: {
+          type: "object",
+          properties: {
+            task: { type: "string", description: "What to do, described in natural language. Be specific about what to click, where to type, etc. Example: 'Click the blue Submit button in the bottom right', 'Click the play button on the video', 'Drag the slider to 75%'" },
+          },
+          required: ["task"],
         },
       },
     ],
@@ -421,6 +433,15 @@ async function executeToolInternal(
         args: [selector, label, duration],
       });
       return { success: true, result: `Highlighted ${selector}${label ? ` — "${label}"` : ""}` };
+    }
+
+    case "computerAction": {
+      const task = args.task as string;
+      const result = await executeComputerAction(task);
+      return {
+        success: result.success,
+        result: result.result,
+      };
     }
 
     default:
