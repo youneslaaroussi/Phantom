@@ -8,7 +8,7 @@ const SERVER_URL_KEY = "phantom_server_url";
 export type ConnectionMode = "hosted" | "byok";
 
 // Default server URL — update after Cloud Run deploy
-const DEFAULT_SERVER_URL = "wss://phantom-server-XXXXX.run.app";
+const DEFAULT_SERVER_URL = "wss://phantom-server-175557989181.us-central1.run.app";
 
 export async function getConnectionMode(): Promise<ConnectionMode> {
   return new Promise((resolve) => {

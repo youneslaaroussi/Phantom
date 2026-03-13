@@ -6,9 +6,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Mic, Square, Settings, ChevronDown, Volume2, Eye, EyeOff } from "lucide-react";
+import { Mic, Square, Settings, ChevronDown, Volume2, Eye, EyeOff, Terminal } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
+import { MarkdownText } from "./markdown";
+import { AnimatedMascot } from "./animated-mascot";
+import { getConnectionMode, type ConnectionMode } from "../lib/connection-mode";
 import type { LiveVoiceName } from "../lib/live/types";
 
 const VOICES: { id: LiveVoiceName; label: string; desc: string }[] = [
@@ -24,9 +27,10 @@ const VOICES: { id: LiveVoiceName; label: string; desc: string }[] = [
 
 interface VoiceScreenProps {
   onOpenSettings: () => void;
+  onOpenTraces: () => void;
 }
 
-export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
+export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) => {
   const {
     state,
     connect,
@@ -47,6 +51,18 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
 
   const [textInput, setTextInput] = useState("");
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode | null>(null);
+
+  useEffect(() => {
+    getConnectionMode().then(setConnectionMode);
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes["phantom_connection_mode"]) {
+        setConnectionMode(changes["phantom_connection_mode"].newValue as ConnectionMode);
+      }
+    };
+    chrome.storage.local.onChanged.addListener(listener);
+    return () => chrome.storage.local.onChanged.removeListener(listener);
+  }, []);
 
   const isConnected = state.status === "connected";
   const isConnecting = state.status === "connecting";
@@ -90,34 +106,44 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
     setTextInput("");
   };
 
-  // Wave color based on state
-  const waveColor = state.isListening
-    ? "#ef4444" // red when listening
-    : state.isSpeaking
-    ? "#3b82f6" // blue when speaking
-    : executingTool
-    ? "#a855f7" // purple when running tools
-    : "#3b82f6"; // default blue
-
   return (
-    <div className="relative w-full h-full bg-black flex flex-col">
+    <div className="relative w-full h-full flex flex-col" style={{ background: "#0a0a12" }}>
       {/* Header */}
       <div className="relative z-20 flex items-center justify-between px-4 py-3">
-        <div className="font-mono text-xs tracking-widest text-gray-500">PHANTOM</div>
+        <div className="flex items-center gap-2">
+          <img src={chrome.runtime.getURL("assets/mascot.png")} alt="" className="w-5 h-5" style={{ imageRendering: "pixelated" as const }} />
+          <span className="font-mono text-xs tracking-widest text-gray-500">PHANTOM</span>
+          {connectionMode && (
+            <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded ${
+              connectionMode === "hosted"
+                ? "bg-blue-500/15 text-blue-400"
+                : "bg-amber-500/15 text-amber-400"
+            }`}>
+              {connectionMode === "hosted" ? "PROXY" : "BYOK"}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setVisionEnabled(!visionEnabled)}
             className={`p-1.5 rounded-lg transition-colors ${
               visionEnabled
-                ? "bg-blue-500/20 text-blue-400"
+                ? "bg-cyan-500/20 text-cyan-400"
                 : "hover:bg-white/5 text-gray-500"
             }`}
-            title={visionEnabled ? "Vision on — streaming screen" : "Vision off"}
+            title={visionEnabled ? "Screen sharing on — Phantom can see your screen" : "Screen sharing off"}
           >
             {visionEnabled
               ? <Eye className="w-4 h-4" />
               : <EyeOff className="w-4 h-4" />
             }
+          </button>
+          <button
+            onClick={onOpenTraces}
+            className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+            title="Traces"
+          >
+            <Terminal className="w-4 h-4 text-gray-500" />
           </button>
           <button
             onClick={onOpenSettings}
@@ -129,35 +155,21 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
         </div>
       </div>
 
-      {/* Main area — wave + mic button */}
+      {/* Main area — mascot + mic button */}
       <div className="flex-1 relative flex flex-col items-center justify-center">
-        {/* Wave visualizer — fills background */}
-        {isConnected && (
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <WaveVisualizer
-              level={state.isSpeaking ? outputLevel : state.isListening ? inputLevel : 0.02}
-              isActive={state.isSpeaking || state.isListening}
-              color={waveColor}
-              className="w-full h-full"
-            />
-          </div>
-        )}
-
-        {/* Audio input level bars */}
-        {state.isListening && (
-          <div className="relative z-10 flex items-center gap-1 h-8 mb-6">
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="w-1.5 rounded-full bg-red-500 transition-all duration-75"
-                style={{
-                  height: `${Math.min(100, Math.max(20, inputLevel * 100 * (5 - Math.abs(i - 2))))}%`,
-                  opacity: inputLevel > i * 0.15 ? 1 : 0.3,
-                }}
-              />
-            ))}
-          </div>
-        )}
+        {/* Animated mascot */}
+        <div className="relative z-10 mb-6">
+          <AnimatedMascot
+            state={
+              executingTool ? "thinking"
+              : state.isSpeaking ? "talking"
+              : state.isListening ? "listening"
+              : isConnected ? "idle"
+              : "sleeping"
+            }
+            size={80}
+          />
+        </div>
 
         {/* Mic button */}
         <button
@@ -167,9 +179,9 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
             relative z-10 w-24 h-24 rounded-full transition-all duration-300
             flex items-center justify-center
             ${state.isListening
-              ? "bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/40"
+              ? "bg-purple-500 hover:bg-purple-600 shadow-lg shadow-purple-500/40"
               : isConnected
-              ? "bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/30"
+              ? "bg-cyan-500 hover:bg-cyan-400 shadow-lg shadow-cyan-500/30"
               : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
             }
             ${isConnecting ? "opacity-50 cursor-wait animate-pulse" : "cursor-pointer"}
@@ -187,7 +199,7 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
             <Mic className={`w-10 h-10 ${isConnected ? "text-white" : "text-gray-400"}`} />
           )}
           {state.isListening && (
-            <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-20" />
+            <span className="absolute inset-0 rounded-full bg-purple-500 animate-ping opacity-20" />
           )}
         </button>
 
@@ -206,11 +218,11 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
           )}
 
           {isConnected && !state.isListening && !state.isSpeaking && !executingTool && !transcript && (
-            <p className="text-blue-400 text-sm">Ready</p>
+            <p className="text-cyan-400 text-sm">Ready</p>
           )}
 
           {state.isListening && !transcript && (
-            <p className="text-red-400 text-sm font-medium">Listening...</p>
+            <p className="text-purple-400 text-sm font-medium">Listening...</p>
           )}
 
           {executingTool && (
@@ -218,7 +230,7 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
           )}
 
           {transcript && (
-            <p className="text-gray-300 text-sm leading-relaxed">{transcript}</p>
+            <MarkdownText content={transcript} className="text-gray-300 text-sm leading-relaxed" />
           )}
         </div>
 
@@ -232,6 +244,19 @@ export const VoiceScreen = ({ onOpenSettings }: VoiceScreenProps) => {
           </button>
         )}
       </div>
+
+      {/* Wave visualizer — pinned to bottom */}
+      {isConnected && (
+        <div className="absolute bottom-0 left-0 right-0 h-52 overflow-hidden pointer-events-none z-10">
+          <WaveVisualizer
+            inputLevel={state.isListening ? inputLevel : 0}
+            outputLevel={state.isSpeaking ? outputLevel : 0.02}
+            isListening={state.isListening}
+            isSpeaking={state.isSpeaking}
+            className="w-full h-full"
+          />
+        </div>
+      )}
 
       {/* Bottom bar — voice selector + text input */}
       <div className="relative z-20 border-t border-gray-900 px-4 py-3 space-y-3">

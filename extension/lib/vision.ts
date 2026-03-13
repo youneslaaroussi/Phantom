@@ -1,14 +1,14 @@
 /**
- * Vision — periodic screen capture and streaming to Gemini Live
+ * Vision — lets Phantom see the user's screen
  * 
- * Captures the active tab at low frequency, detects changes,
- * and sends JPEG frames to the Live session.
- * Shows a "Phantom is watching" indicator on the page.
+ * Captures what's on the active tab once per second
+ * and sends it to the Live session so Phantom can see what the user sees.
+ * Shows an indicator on the page so the user knows Phantom is watching.
  */
 
 import { SHOW_INDICATOR_SCRIPT, HIDE_INDICATOR_SCRIPT } from "./vision-indicator";
 
-const CAPTURE_INTERVAL_MS = 3000;
+const CAPTURE_INTERVAL_MS = 1000;
 const JPEG_QUALITY = 50;
 
 let captureInterval: ReturnType<typeof setInterval> | null = null;
@@ -17,7 +17,7 @@ let sendImageFn: ((base64: string, mimeType: string) => void) | null = null;
 let indicatorTabId: number | null = null;
 
 /**
- * Start streaming tab screenshots to the Live session.
+ * Start letting Phantom see the user's screen.
  */
 export function startVision(
   sendImage: (base64: string, mimeType: string) => void
@@ -60,7 +60,9 @@ async function showIndicator() {
       target: { tabId: tab.id },
       func: SHOW_INDICATOR_SCRIPT,
     });
-  } catch {}
+  } catch (e) {
+    console.warn("[Vision] Failed to show indicator:", e);
+  }
 }
 
 async function hideIndicator() {
@@ -100,13 +102,6 @@ async function captureAndSend() {
     });
 
     const base64 = dataUrl.replace(/^data:image\/jpeg;base64,/, "");
-
-    // Simple change detection: compare first 200 chars of base64
-    const signature = base64.substring(0, 200);
-    if (signature === lastFrameData) {
-      return; // No visible change, skip
-    }
-    lastFrameData = signature;
 
     sendImageFn(base64, "image/jpeg");
   } catch {

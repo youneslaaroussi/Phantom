@@ -7,6 +7,7 @@ import { ArrowLeft, Eye, EyeOff, CheckCircle, ExternalLink, Trash2, Globe, Key }
 import { getApiKey, saveApiKey, removeApiKey, isValidKeyFormat } from "../lib/api-key";
 import { getConnectionMode, setConnectionMode, type ConnectionMode } from "../lib/connection-mode";
 import { useSession } from "../lib/session";
+import { MicSelector } from "./mic-selector";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -102,6 +103,12 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
             </div>
           </div>
 
+          {/* Microphone */}
+          <div className="space-y-3">
+            <div className="text-[10px] text-gray-600 font-mono uppercase tracking-wider">Microphone</div>
+            <MicSelector />
+          </div>
+
           {/* API Key */}
           <div className="space-y-3">
             <div className="text-[10px] text-gray-600 font-mono uppercase tracking-wider">Gemini API Key</div>
@@ -169,7 +176,7 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500">Model</span>
-                <span className="text-gray-400 font-mono">gemini-2.0-flash</span>
+                <span className="text-gray-400 font-mono">gemini-2.5-flash</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500">Audio</span>

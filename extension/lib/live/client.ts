@@ -131,24 +131,24 @@ export class LiveSession {
       };
     }
 
-    const setup: Record<string, unknown> = {
-      setup: {
-        model: modelName,
-        generationConfig,
-      },
+    const config: Record<string, unknown> = {
+      model: modelName,
+      generationConfig,
     };
 
     if (this.config.systemInstruction) {
-      (setup.setup as Record<string, unknown>).systemInstruction = {
+      config.systemInstruction = {
         parts: [{ text: this.config.systemInstruction }],
       };
     }
 
     if (this.config.tools && this.config.tools.length > 0) {
-      (setup.setup as Record<string, unknown>).tools = this.config.tools;
+      config.tools = this.config.tools;
     }
 
-    this.ws.send(JSON.stringify(setup));
+    const msg = { setup: config };
+    console.log("[LiveSession] Setup message:", JSON.stringify(msg).slice(0, 500));
+    this.ws.send(JSON.stringify(msg));
   }
 
   private async handleMessage(data: string | ArrayBuffer | Blob, onSetupComplete?: () => void) {
@@ -163,6 +163,10 @@ export class LiveSession {
       }
 
       const message: BidiServerMessage = JSON.parse(textData);
+
+      if (!message.setupComplete && !message.serverContent && !message.toolCall && !message.toolCallCancellation) {
+        console.log("[LiveSession] Unknown/error message:", textData.slice(0, 500));
+      }
 
       if (message.setupComplete) {
         this.setState({ status: "connected", error: undefined, closeCode: undefined, closeReason: undefined });
@@ -342,18 +346,23 @@ export class LiveSession {
   }
 
   sendImage(base64Data: string, mimeType: string): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn("[LiveSession] sendImage: ws not open");
+      return;
+    }
 
     const message = {
       realtimeInput: {
-        media: {
+        video: {
           data: base64Data,
           mimeType,
         },
       },
     };
 
-    this.ws.send(JSON.stringify(message));
+    const payload = JSON.stringify(message);
+    console.log("[LiveSession] sendImage: %d KB, mimeType=%s", Math.round(payload.length / 1024), mimeType);
+    this.ws.send(payload);
   }
 
   disconnect(): void {

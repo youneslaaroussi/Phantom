@@ -7,6 +7,7 @@ import { Key, ArrowRight, Eye, EyeOff, ExternalLink, Globe } from "lucide-react"
 import { saveApiKey, isValidKeyFormat } from "../lib/api-key";
 import { setConnectionMode } from "../lib/connection-mode";
 import { useSession } from "../lib/session";
+import { MicSelector } from "./mic-selector";
 
 interface SetupScreenProps {
   onComplete: () => void;
@@ -53,6 +54,8 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
               Talk to AI. Control your browser by voice.
             </p>
           </div>
+
+          <MicSelector className="mb-2" />
 
           <div className="space-y-3">
             <button

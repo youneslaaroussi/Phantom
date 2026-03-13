@@ -30,7 +30,34 @@ app.get(
         );
       },
       onMessage(event, _ws) {
-        const data = typeof event.data === "string" ? event.data : event.data.toString();
+        const raw = event.data;
+        console.log("[ws] raw type=%s constructor=%s", typeof raw, raw?.constructor?.name);
+        let data: string;
+        if (typeof raw === "string") {
+          data = raw;
+        } else if (Buffer.isBuffer(raw)) {
+          data = raw.toString("utf-8");
+        } else if (raw instanceof ArrayBuffer) {
+          data = Buffer.from(raw).toString("utf-8");
+        } else if (Array.isArray(raw)) {
+          data = Buffer.concat(raw).toString("utf-8");
+        } else {
+          data = String(raw);
+        }
+        
+        if (data.includes('"video"')) {
+          try {
+            const parsed = JSON.parse(data);
+            const b64 = parsed.realtimeInput?.video?.data;
+            if (b64) {
+              console.log("[ws] Video frame OK: json_len=%d b64_len=%d", data.length, b64.length);
+            } else {
+              console.log("[ws] Video frame MISSING data field, keys:", JSON.stringify(Object.keys(parsed.realtimeInput || {})));
+            }
+          } catch (e) {
+            console.log("[ws] Video frame JSON PARSE FAILED: %s", (e as Error).message);
+          }
+        }
         proxy?.send(data);
       },
       onClose() {

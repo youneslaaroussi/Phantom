@@ -37,6 +37,8 @@
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
+  - [Naming Convention: Plain Language](#naming-convention-plain-language)
+  - [Adding a New Tool](#adding-a-new-tool)
 
 ---
 
@@ -47,15 +49,15 @@ Phantom is a Chrome extension that turns your browser into a voice-controlled wo
 **What makes it different:**
 
 - **Real-time voice, not chat.** Bidirectional audio streaming over WebSocket. You can interrupt it mid-sentence. It responds instantly. No typing, no waiting for transcription — just talk.
-- **It can see your screen.** Toggle vision mode and Phantom streams your active tab as JPEG frames to Gemini every 3 seconds. It knows what you're looking at without you having to describe it.
-- **It takes action.** 12 browser tools via function calling — click elements, fill inputs, scroll pages, switch tabs, press keys. The model decides what to do and does it.
+- **It can see your screen.** Toggle screen sharing and Phantom shows your active tab to Gemini once per second. It knows what you're looking at without you having to describe it.
+- **It takes action.** Browser tools via function calling — click on things, type into fields, scroll pages, switch tabs, press keys. The model decides what to do and does it.
 - **Zero infrastructure for users.** Either paste your own Gemini API key (free from Google AI Studio) or connect through our hosted proxy. No local models, no downloads, no setup friction.
 
 **Key Capabilities:**
 
 - 🎙️ Real-time bidirectional voice (Gemini Live API, WebSocket)
 - 👁️ Continuous screen vision with change detection
-- 🖱️ 12 browser automation tools via function calling
+- 🖱️ Browser automation tools via function calling
 - 🌊 WebGL audio visualizer (state-aware color changes)
 - 🔌 Hosted mode (Cloud Run proxy) or BYOK (bring your own key)
 - 8 voice options (Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr)
@@ -77,7 +79,7 @@ The system has four layers:
 1. **User Input** — Voice (microphone → AudioWorklet → PCM 16kHz) or text (keyboard)
 2. **Chrome Extension** — Session provider orchestrates audio capture, audio playback, vision module, and tool execution
 3. **Connection** — Mode switch routes to either direct WebSocket (BYOK) or Cloud Run proxy (hosted)
-4. **Gemini Live API** — `gemini-2.0-flash-exp` processes audio, generates spoken responses, and issues function calls for browser tools
+4. **Gemini Live API** — `gemini-2.5-flash-native-audio-preview-12-2025` processes audio, generates spoken responses, and issues function calls for browser tools
 
 Audio flows bidirectionally through a single persistent WebSocket. Tool calls arrive as structured JSON, get executed against Chrome APIs, and results feed back into the conversation.
 
@@ -110,7 +112,7 @@ The session starts with a `setup` message containing the model config, system in
 <img src="./diagrams/vision_pipeline.png" alt="Vision Pipeline" width="600" />
 </div>
 
-Vision mode streams periodic screenshots of the active tab to Gemini:
+Vision mode lets Phantom see the user's screen by sending periodic frames to Gemini:
 
 1. **User toggles the eye icon** in the header
 2. **Interval timer** fires every 3 seconds
@@ -123,7 +125,7 @@ When the user switches tabs, the indicator follows — the old one is removed an
 
 **Why 3 seconds?** Too frequent and Gemini's context fills up fast, causing crashes. Too infrequent and you miss page changes. 3 seconds with change detection hits the sweet spot — most static browsing sends very few frames, while active navigation captures every meaningful state.
 
-**Why 50% JPEG?** Gemini doesn't need retina-quality screenshots to understand page layout. Low quality keeps frame size small (~30-60KB) which matters when you're sending frames every few seconds over a WebSocket.
+**Why 50% JPEG?** Gemini doesn't need high-resolution images to understand page layout. Low quality keeps frame size small (~30-60KB) which matters when you're sending frames every few seconds over a WebSocket.
 
 ### Tool Execution
 
@@ -146,19 +148,21 @@ When Gemini decides to take action, it sends a `toolCall` message with a functio
 
 | Tool | What it does |
 |------|-------------|
-| `clickElement` | Clicks an element by CSS selector |
-| `fillInput` | Sets the value of an input field |
-| `pressKey` | Dispatches a keyboard event (Enter, Escape, Tab, etc.) |
-| `scrollDown` | Scrolls the page down by a specified amount |
-| `scrollUp` | Scrolls the page up by a specified amount |
+| `clickOn` | Clicks on something on the page |
+| `typeInto` | Types text into a field on the page |
+| `pressKey` | Presses a keyboard key (Enter, Escape, Tab, etc.) |
+| `scrollDown` | Scrolls the page down to see more content |
+| `scrollUp` | Scrolls the page up to see earlier content |
 
-**Inspection (3 tools):**
+**Reading the page (3 tools):**
 
 | Tool | What it does |
 |------|-------------|
-| `captureScreenshot` | Takes a JPEG screenshot of the visible tab |
-| `getAccessibilitySnapshot` | Reads the accessibility tree — interactive elements with roles, labels, and selectors |
-| `findElements` | Searches the page for elements matching a natural language query |
+| `readPageContent` | Reads the page to see all the buttons, links, inputs, and other interactive elements |
+| `findOnPage` | Searches for something on the page by text or selector |
+| `scrollTo` | Scrolls to a specific thing on the page so the user can see it |
+
+There's also a `highlight` tool that highlights something on the page with a yellow outline to show the user what was found.
 
 After execution, the result is sent back to Gemini as a `toolResponse`, and the model continues — it might speak a confirmation, call another tool, or ask a follow-up question. This creates an autonomous agent loop: observe → decide → act → observe.
 
@@ -202,18 +206,18 @@ This matters for a voice agent because:
 
 Phantom supports both approaches:
 
-**Continuous (vision mode ON):** Frames stream automatically every 3 seconds. The model has ambient awareness of the screen. Good for guided workflows — "walk me through this form", "what am I looking at", "tell me when the page loads".
+**Continuous (vision ON):** Frames stream automatically every 3 seconds. The model has ambient awareness of the screen. Good for guided workflows — "walk me through this form", "what am I looking at", "tell me when the page loads".
 
-**On-demand (vision mode OFF):** The model uses `captureScreenshot` as a tool — it explicitly requests a screenshot when it needs visual context. Good for privacy and when you don't want constant screen capture.
+**On-demand (vision OFF):** The model uses `readPageContent` to understand what's on the page. Good for privacy and when you don't want constant screen sharing.
 
 The system prompt changes based on which mode is active:
 
 ```
-Vision ON:  "You are receiving periodic screenshots. Describe what you 
-            actually see. Do NOT hallucinate page content."
+Vision ON:  "You can see the user's screen. Describe what you 
+            actually see. Do NOT make up screen contents."
 
-Vision OFF: "You cannot see the screen. Use captureScreenshot or 
-            getAccessibilitySnapshot. Do NOT guess what's on the page."
+Vision OFF: "You cannot see the user's screen. Use readPageContent 
+            to check what's on the page. Do NOT guess."
 ```
 
 This prevents the model from confidently describing a page it can't actually see — a common failure mode with multimodal models.
@@ -223,8 +227,8 @@ This prevents the model from confidently describing a page it can't actually see
 The system prompt explicitly tells Gemini what capabilities are currently available. This is critical because the Live API model will happily hallucinate visual descriptions if it thinks it has vision when it doesn't.
 
 We split the prompt into a base instruction (always present) and an addendum that changes based on state:
-- **Vision ON addendum** — tells the model it's receiving frames, can reference screen content, should not take redundant screenshots
-- **Vision OFF addendum** — tells the model it's blind, must use tools, should not guess
+- **Vision ON addendum** — tells the model it can see the screen, can reference what's on screen, should just look instead of using tools
+- **Vision OFF addendum** — tells the model it can't see the screen, must use tools to check, should not guess
 
 When the user toggles vision, the next `connect()` call rebuilds the system prompt with the correct addendum. This means the model always has accurate self-knowledge.
 
@@ -250,11 +254,11 @@ Tools are declared to Gemini as `functionDeclarations` in the session setup. The
 3. Returns a JSON result (`{ success, result?, error? }`)
 4. Result is sent back as a `toolResponse` message
 
-For DOM interaction tools (`clickElement`, `fillInput`, `findElements`, `getAccessibilitySnapshot`), we use `chrome.scripting.executeScript()` to inject a function into the active tab. This runs in the page's context with full DOM access.
+For page interaction tools (`clickOn`, `typeInto`, `findOnPage`, `readPageContent`), we use `chrome.scripting.executeScript()` to inject a function into the active tab. This runs in the page's context with full DOM access.
 
-The accessibility snapshot walks the DOM tree, collecting interactive elements (links, buttons, inputs, selects, textareas) with their roles, labels, and CSS selectors. This gives Gemini a structured view of actionable elements without needing to process a screenshot.
+`readPageContent` walks the page structure, collecting all the buttons, links, inputs, and other things the user can interact with — along with their labels and selectors. This gives Gemini a structured view of what's on screen without needing to see the page visually.
 
-`findElements` takes a natural language query and searches the page for matching elements by text content, aria-label, placeholder, or role — returning indexed results the model can reference in subsequent `clickElement` or `fillInput` calls.
+`findOnPage` searches the page for matching elements by text content, aria-label, placeholder, or role — returning indexed results the model can reference in subsequent `clickOn` or `typeInto` calls.
 
 ---
 
@@ -305,15 +309,15 @@ pnpm build
 **Voice commands:**
 - "Open YouTube" → opens youtube.com in a new tab
 - "Click the search button" → finds and clicks the search button
-- "Fill the email field with hello@example.com" → fills the input
-- "What's on this page?" → takes a screenshot and describes it
+- "Type hello@example.com in the email field" → types into the input
+- "What's on this page?" → reads the page and describes it
 - "Scroll down" → scrolls the page
 
-**Vision mode:**
+**Screen sharing:**
 - Click the eye icon in the header to toggle
-- When active, Phantom streams your screen to Gemini every 3 seconds
-- A "Phantom is watching" indicator appears on the page
-- Ask "what do you see?" and it describes your current page in real-time
+- When active, Phantom can see your screen (updates every second)
+- A floating indicator appears on the page so you know Phantom is watching
+- Ask "what do you see?" and it describes what's on your screen in real-time
 
 ---
 
@@ -368,6 +372,34 @@ phantom/
 ---
 
 ## Contributing
+
+### Naming Convention: Plain Language
+
+All tool names, descriptions, system prompts, and user-facing text use **natural, layman-friendly language** instead of technical jargon. This applies to both what the AI model sees and what the user sees.
+
+**Principle:** If a non-technical person wouldn't understand it, rewrite it.
+
+| Don't say | Say instead |
+|-----------|------------|
+| `captureScreenshot` | (removed — use vision or `readPageContent`) |
+| `getAccessibilitySnapshot` | `readPageContent` |
+| `findElements` | `findOnPage` |
+| `clickElement` | `clickOn` |
+| `fillInput` | `typeInto` |
+| `scrollToElement` | `scrollTo` |
+| `highlightElement` | `highlight` |
+| "Screenshot captured" | (not applicable — tool removed) |
+| "Accessibility tree" | "buttons, links, inputs, and other things you can interact with" |
+| "Vision mode is active" | "You can see the user's screen" |
+| "Vision mode deactivated" | "You can no longer see the user's screen" |
+| "Streaming screen" | "Screen sharing on — Phantom can see your screen" |
+| "Periodic screenshots" | "live view updated every second" |
+
+This matters because:
+1. **For the AI model** — simpler tool names and descriptions lead to better tool selection. The model understands "click on" better than "clickElement" and "read the page" better than "get accessibility snapshot".
+2. **For the user** — tooltips, status messages, and trace labels should make sense to anyone, not just developers.
+
+When adding new tools or prompts, follow this convention. Write descriptions as if explaining to someone who has never coded.
 
 ### Adding a New Tool
 

@@ -6,7 +6,11 @@
 #   gcloud config set project YOUR_PROJECT_ID
 #
 # Usage:
-#   GEMINI_API_KEY=AIza... ./deploy.sh
+#   ./deploy.sh
+#
+# The GOOGLE_GENERATIVE_AI_API_KEYS secret must exist in Secret Manager.
+# Create it with:
+#   echo -n "key1,key2,..." | gcloud secrets create gemini-api-keys --data-file=-
 
 set -euo pipefail
 
@@ -14,12 +18,7 @@ PROJECT_ID=$(gcloud config get-value project)
 REGION="${REGION:-us-central1}"
 SERVICE_NAME="phantom-server"
 IMAGE="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
-
-if [ -z "${GEMINI_API_KEY:-}" ]; then
-  echo "Error: GEMINI_API_KEY not set"
-  echo "Usage: GEMINI_API_KEY=AIza... ./deploy.sh"
-  exit 1
-fi
+SECRET_NAME="gemini-api-keys"
 
 echo "Building image..."
 gcloud builds submit --tag "${IMAGE}" .
@@ -30,7 +29,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --region "${REGION}" \
   --platform managed \
   --allow-unauthenticated \
-  --set-env-vars "GEMINI_API_KEY=${GEMINI_API_KEY}" \
+  --set-secrets "GOOGLE_GENERATIVE_AI_API_KEYS=${SECRET_NAME}:latest" \
   --memory 256Mi \
   --cpu 1 \
   --min-instances 0 \

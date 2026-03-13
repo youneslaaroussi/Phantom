@@ -1,14 +1,10 @@
-/**
- * WebGL audio wave visualizer
- * Uses simplex noise on the GPU for organic, responsive motion.
- */
-
 import React, { useRef, useEffect, useCallback } from "react";
 
 interface WaveVisualizerProps {
-  level: number;
-  isActive: boolean;
-  color?: string;
+  inputLevel: number;
+  outputLevel: number;
+  isListening: boolean;
+  isSpeaking: boolean;
   className?: string;
 }
 
@@ -21,10 +17,11 @@ const FRAG = `
   precision mediump float;
   
   uniform float u_time;
-  uniform float u_level;
-  uniform float u_active;
+  uniform float u_inputLevel;
+  uniform float u_outputLevel;
+  uniform float u_listening;
+  uniform float u_speaking;
   uniform vec2 u_resolution;
-  uniform vec3 u_color;
   
   vec3 mod289(vec3 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
   vec2 mod289(vec2 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
@@ -56,50 +53,60 @@ const FRAG = `
   void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution.xy;
     
-    float speed = 0.5 + u_level * 2.0;
-    float height = 0.15 + u_level * 0.35;
+    float outSpeed = 0.5 + u_outputLevel * 2.0;
+    float outHeight = 0.08 + u_outputLevel * 0.25;
+    float ow1 = snoise(vec2(uv.x * 3.0 + u_time * outSpeed * 0.3, u_time * 0.2)) * outHeight;
+    float ow2 = snoise(vec2(uv.x * 5.0 - u_time * outSpeed * 0.5, u_time * 0.3 + 10.0)) * outHeight * 0.7;
+    float ow3 = snoise(vec2(uv.x * 8.0 + u_time * outSpeed * 0.8, u_time * 0.4 + 20.0)) * outHeight * 0.4;
+    float outWave = ow1 + ow2 + ow3;
+    float outThreshold = outWave + 0.15;
+    float outDist = uv.y - outThreshold;
+    float outAlpha = smoothstep(0.12, 0.0, outDist);
+    float outGlow = exp(-outDist * 8.0) * 0.4 * u_outputLevel;
+    outAlpha += outGlow;
+    outAlpha *= 0.2 + u_speaking * 0.8;
+    float outCrest = smoothstep(0.02, 0.0, abs(outDist)) * u_outputLevel * 0.4;
+    vec3 outColor = vec3(0.4, 0.91, 0.98);
+    vec3 outCol = outColor * (1.0 - uv.y * 0.5) + vec3(1.0) * outCrest;
+
+    float inSpeed = 0.6 + u_inputLevel * 2.5;
+    float inHeight = 0.06 + u_inputLevel * 0.2;
+    float iw1 = snoise(vec2(uv.x * 4.0 - u_time * inSpeed * 0.4, u_time * 0.25 + 5.0)) * inHeight;
+    float iw2 = snoise(vec2(uv.x * 6.0 + u_time * inSpeed * 0.6, u_time * 0.35 + 15.0)) * inHeight * 0.6;
+    float inWave = iw1 + iw2;
+    float inThreshold = inWave + 0.12;
+    float inDist = uv.y - inThreshold;
+    float inAlpha = smoothstep(0.10, 0.0, inDist);
+    float inGlow = exp(-inDist * 8.0) * 0.3 * u_inputLevel;
+    inAlpha += inGlow;
+    inAlpha *= 0.15 + u_listening * 0.85;
+    float inCrest = smoothstep(0.02, 0.0, abs(inDist)) * u_inputLevel * 0.5;
+    vec3 inColor = vec3(0.66, 0.33, 0.97);
+    vec3 inCol = inColor * (1.0 - uv.y * 0.5) + vec3(1.0) * inCrest;
+
+    vec3 col = outCol * outAlpha + inCol * inAlpha * (1.0 - outAlpha * 0.5);
+    float alpha = max(outAlpha, inAlpha) * 0.85;
     
-    float w1 = snoise(vec2(uv.x * 3.0 + u_time * speed * 0.3, u_time * 0.2)) * height;
-    float w2 = snoise(vec2(uv.x * 5.0 - u_time * speed * 0.5, u_time * 0.3 + 10.0)) * height * 0.7;
-    float w3 = snoise(vec2(uv.x * 8.0 + u_time * speed * 0.8, u_time * 0.4 + 20.0)) * height * 0.4;
-    
-    float wave = w1 + w2 + w3;
-    float threshold = wave + 0.3;
-    float dist = uv.y - threshold;
-    
-    float alpha = smoothstep(0.15, 0.0, dist);
-    float glow = exp(-dist * 8.0) * 0.5 * u_level;
-    alpha += glow;
-    alpha *= 0.3 + u_active * 0.7;
-    
-    float gradient = 1.0 - uv.y * 0.5;
-    vec3 col = u_color * gradient;
-    
-    float crest = smoothstep(0.02, 0.0, abs(dist)) * u_level * 0.5;
-    col += vec3(1.0) * crest;
-    
-    gl_FragColor = vec4(col, alpha * 0.8);
+    gl_FragColor = vec4(col, alpha);
   }
 `;
 
-function hexToRgb(hex: string): [number, number, number] {
-  hex = hex.replace(/^#/, "");
-  const n = parseInt(hex, 16);
-  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
-}
-
-export const WaveVisualizer = ({ level, isActive, color = "#3b82f6", className = "" }: WaveVisualizerProps) => {
+export const WaveVisualizer = ({ inputLevel, outputLevel, isListening, isSpeaking, className = "" }: WaveVisualizerProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGLRenderingContext | null>(null);
   const programRef = useRef<WebGLProgram | null>(null);
   const frameRef = useRef(0);
   const t0Ref = useRef(Date.now());
-  const levelRef = useRef(0);
-  const activeRef = useRef(0);
+  const inputLevelRef = useRef(0);
+  const outputLevelRef = useRef(0);
+  const listeningRef = useRef(0);
+  const speakingRef = useRef(0);
 
-  useEffect(() => { levelRef.current = levelRef.current * 0.7 + level * 0.3; }, [level]);
-  useEffect(() => { activeRef.current = activeRef.current * 0.85 + (isActive ? 1 : 0) * 0.15; }, [isActive]);
+  useEffect(() => { inputLevelRef.current = inputLevelRef.current * 0.7 + inputLevel * 0.3; }, [inputLevel]);
+  useEffect(() => { outputLevelRef.current = outputLevelRef.current * 0.7 + outputLevel * 0.3; }, [outputLevel]);
+  useEffect(() => { listeningRef.current = listeningRef.current * 0.85 + (isListening ? 1 : 0) * 0.15; }, [isListening]);
+  useEffect(() => { speakingRef.current = speakingRef.current * 0.85 + (isSpeaking ? 1 : 0) * 0.15; }, [isSpeaking]);
 
   const initGL = useCallback(() => {
     const canvas = canvasRef.current;
@@ -144,15 +151,15 @@ export const WaveVisualizer = ({ level, isActive, color = "#3b82f6", className =
 
     const t = (Date.now() - t0Ref.current) / 1000;
     gl.uniform1f(gl.getUniformLocation(prog, "u_time"), t);
-    gl.uniform1f(gl.getUniformLocation(prog, "u_level"), levelRef.current);
-    gl.uniform1f(gl.getUniformLocation(prog, "u_active"), activeRef.current);
+    gl.uniform1f(gl.getUniformLocation(prog, "u_inputLevel"), inputLevelRef.current);
+    gl.uniform1f(gl.getUniformLocation(prog, "u_outputLevel"), outputLevelRef.current);
+    gl.uniform1f(gl.getUniformLocation(prog, "u_listening"), listeningRef.current);
+    gl.uniform1f(gl.getUniformLocation(prog, "u_speaking"), speakingRef.current);
     gl.uniform2f(gl.getUniformLocation(prog, "u_resolution"), canvas.width, canvas.height);
-    const rgb = hexToRgb(color);
-    gl.uniform3f(gl.getUniformLocation(prog, "u_color"), rgb[0], rgb[1], rgb[2]);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     frameRef.current = requestAnimationFrame(render);
-  }, [color]);
+  }, []);
 
   useEffect(() => {
     initGL();

@@ -22,17 +22,25 @@ import { getToolDeclarations, executeTool } from "./tools";
 import { getApiKey } from "./api-key";
 import { getConnectionMode, getServerUrl, type ConnectionMode } from "./connection-mode";
 import { startVision, stopVision, isVisionActive } from "./vision";
+import { getSavedMicId } from "../components/mic-selector";
+import { startSession as startTrace, endSession as endTrace, addTrace } from "./trace";
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
 
-const MODEL = "gemini-2.0-flash-exp";
+const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 const VOICE_KEY = "phantom_voice";
 
-const SYSTEM_INSTRUCTION_BASE = `You are Phantom, a voice-controlled AI agent that can browse and interact with any website.
+const SYSTEM_INSTRUCTION_BASE = `You are Phantom — a small, curious AI spirit that lives in the user's browser. You're like a helpful little wisp: friendly, playful, and eager to help.
 
-You have tools to navigate tabs, click elements, fill forms, take screenshots, and more. Use them proactively.
+You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.
+
+Personality:
+- You're a tiny companion, not a corporate assistant. Be warm and brief.
+- Show curiosity — "ooh let me check that" or "hmm interesting page"
+- Be casual but competent. You're a friend who happens to be really good at browsers.
+- When you succeed, be subtly happy about it. When you fail, be honest and try again.
+- Keep responses SHORT — the user is listening, not reading. 1-2 sentences max unless they ask for detail.
 
 Guidelines:
-- Be concise in speech — the user is listening, not reading
 - When asked to do something on a page, use getAccessibilitySnapshot first to understand the layout
 - After clicking or filling, briefly confirm what you did
 - If something fails, explain what went wrong and try an alternative approach
@@ -40,19 +48,19 @@ Guidelines:
 
 const VISION_ON_ADDENDUM = `
 
-VISION MODE IS ACTIVE. You are receiving periodic screenshots of the user's screen every few seconds. You can see what they see.
-- You can reference what's on screen directly — no need to take separate screenshots
-- Notice changes (page loads, errors, new content) and react naturally
-- If the user asks "what do you see" or "what's on my screen", describe the latest frame
-- Do NOT hallucinate page content — only describe what you actually see in frames`;
+YOU CAN SEE THE USER'S SCREEN. You are receiving a live view of their screen, updated once per second.
+- You CAN see the screen right now. Describe what you ACTUALLY see.
+- Do NOT use readPageContent — you already have a live view. Just look at the screen.
+- When the user asks "what do you see", describe what's currently on screen.
+- Do NOT make up or guess what's on screen. Only describe what you can actually see.
+- React to changes naturally — new pages loading, content appearing, errors showing up.`;
 
 const VISION_OFF_ADDENDUM = `
 
-VISION MODE IS OFF. You cannot see the user's screen. You must use tools to inspect pages:
-- Use captureScreenshot to see the page visually
-- Use getAccessibilitySnapshot to read page structure
-- Do NOT guess or assume what's on the page without using a tool first
-- If the user asks "what do you see", use captureScreenshot then describe it`;
+YOU CANNOT SEE THE USER'S SCREEN right now. You must use tools to find out what's on the page:
+- Use readPageContent to see what's on the page
+- Do NOT guess or assume what's on screen without checking first
+- If the user asks "what do you see", use readPageContent first then describe it`;
 
 interface SessionContextValue {
   state: LiveSessionState;
@@ -142,17 +150,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       },
       {
         onStateChange: setState,
-        onTranscript: (text) => setTranscript(text),
+        onTranscript: (text) => {
+          setTranscript(text);
+          if (text) addTrace("agent_text", text);
+        },
         onToolCall: async (tc) => {
+          addTrace("tool_call", tc.name, { args: tc.args });
           setExecutingTool(tc.name);
           try {
             const result = await executeTool(tc.name, tc.args);
-            // If tool returned image data, send it as a frame to the session
-            if (result._imageData && result._imageMimeType) {
-              session.sendImage(result._imageData as string, result._imageMimeType as string);
-              delete result._imageData;
-              delete result._imageMimeType;
-            }
+            addTrace("tool_result", JSON.stringify(result).slice(0, 500));
             return result;
           } finally {
             setExecutingTool(null);
@@ -161,11 +168,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         onToolStart: ({ name }) => setExecutingTool(name),
         onToolEnd: () => setExecutingTool(null),
         onOutputLevel: setOutputLevel,
-        onError: (err) => console.error("[Phantom] Session error:", err),
+        onError: (err) => {
+          addTrace("error", err instanceof Error ? err.message : String(err));
+          console.error("[Phantom] Session error:", err);
+        },
       }
     );
 
     sessionRef.current = session;
+    startTrace();
+    addTrace("system", `Connecting (${mode}) with model ${MODEL}, voice ${voice}`);
 
     try {
       if (mode === "hosted") {
@@ -176,12 +188,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await session.connect({ apiKey: apiKey! });
         setHasApiKey(true);
       }
+      addTrace("system", "Connected");
     } catch (err) {
+      addTrace("error", `Connect failed: ${err instanceof Error ? err.message : String(err)}`);
       console.error("[Phantom] Connect failed:", err);
     }
   }, [voice, visionEnabled]);
 
   const disconnect = useCallback(() => {
+    addTrace("system", "Disconnected");
+    endTrace();
     stopVision();
     sessionRef.current?.disconnect();
     sessionRef.current = null;
@@ -195,16 +211,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const setVisionEnabled = useCallback((enabled: boolean) => {
     setVisionEnabledState(enabled);
     if (enabled && sessionRef.current?.isConnected()) {
+      addTrace("system", "Vision enabled");
       startVision((base64, mimeType) => {
+        addTrace("vision_frame", "frame sent");
         sessionRef.current?.sendImage(base64, mimeType);
       });
-      // Notify the model that vision is now active
-      sessionRef.current?.sendText("[SYSTEM] Vision mode activated. You will now receive periodic screenshots of the user's screen. Describe only what you actually see in the frames.");
+      sessionRef.current?.sendText("[SYSTEM] You can now see the user's screen. You'll receive a live view updated every second. Describe only what you actually see.");
     } else {
+      addTrace("system", "Vision disabled");
       stopVision();
-      // Notify the model that vision is disabled
       if (sessionRef.current?.isConnected()) {
-        sessionRef.current?.sendText("[SYSTEM] Vision mode deactivated. You can no longer see the screen. Use captureScreenshot or getAccessibilitySnapshot tools if you need to inspect the page.");
+        sessionRef.current?.sendText("[SYSTEM] You can no longer see the user's screen. Use readPageContent if you need to check what's on the page.");
       }
     }
   }, []);
@@ -223,11 +240,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const startListening = useCallback(async (deviceId?: string) => {
     if (!sessionRef.current?.isConnected()) {
       await connect();
-      // Wait briefly for connection
       await new Promise((r) => setTimeout(r, 500));
     }
+    const micId = deviceId || await getSavedMicId();
     await sessionRef.current?.startListening({
-      deviceId,
+      deviceId: micId,
       onAudioLevel: setInputLevel,
     });
   }, [connect]);
@@ -239,6 +256,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const sendText = useCallback((text: string) => {
     if (!sessionRef.current?.isConnected()) return;
+    addTrace("user_text", text);
     sessionRef.current.sendText(text);
   }, []);
 

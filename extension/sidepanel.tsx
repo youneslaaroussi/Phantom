@@ -3,10 +3,11 @@ import { SessionProvider, useSession } from "./lib/session";
 import { VoiceScreen } from "./components/voice-screen";
 import { SettingsScreen } from "./components/settings-screen";
 import { SetupScreen } from "./components/setup-screen";
+import { TraceViewer } from "./components/trace-viewer";
 import { getConnectionMode } from "./lib/connection-mode";
 import "./style.css";
 
-type Screen = "voice" | "settings" | "setup" | "loading";
+type Screen = "voice" | "settings" | "setup" | "loading" | "traces";
 
 const App = () => {
   const { hasApiKey } = useSession();
@@ -40,7 +41,11 @@ const App = () => {
     return <SettingsScreen onBack={() => setScreen("voice")} />;
   }
 
-  return <VoiceScreen onOpenSettings={() => setScreen("settings")} />;
+  if (screen === "traces") {
+    return <TraceViewer onBack={() => setScreen("voice")} />;
+  }
+
+  return <VoiceScreen onOpenSettings={() => setScreen("settings")} onOpenTraces={() => setScreen("traces")} />;
 };
 
 const SidePanel = () => {

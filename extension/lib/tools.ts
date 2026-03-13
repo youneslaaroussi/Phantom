@@ -3,7 +3,7 @@
  * 
  * Browser tools for Gemini Live function calling:
  * - Navigation & interaction (tabs, clicks, forms)
- * - Page inspection (screenshot, accessibility, title)
+ * - Page reading & element finding
  * - Scrolling & keyboard
  */
 
@@ -22,111 +22,131 @@ export function getToolDeclarations(): LiveToolDeclaration[] {
     functionDeclarations: [
       {
         name: "getPageTitle",
-        description: "Get the title and URL of the current active tab.",
+        description: "See what page the user is on — gets the page title and web address.",
         parameters: { type: "object", properties: {} },
       },
       {
         name: "openTab",
-        description: "Open a URL in a new tab or navigate the current tab.",
+        description: "Go to a website — opens it in a new or current tab.",
         parameters: {
           type: "object",
           properties: {
-            url: { type: "string", description: "URL to open" },
-            newTab: { type: "boolean", description: "Open in new tab (default: true)" },
+            url: { type: "string", description: "The web address to open" },
+            newTab: { type: "boolean", description: "Open in a new tab (default: yes)" },
           },
           required: ["url"],
         },
       },
       {
         name: "getTabs",
-        description: "List all open tabs in the current window.",
+        description: "See all open tabs the user has.",
         parameters: { type: "object", properties: {} },
       },
       {
         name: "switchTab",
-        description: "Switch to a tab by index.",
+        description: "Switch to a different tab by its position.",
         parameters: {
           type: "object",
           properties: {
-            index: { type: "number", description: "Tab index (0-based)" },
+            index: { type: "number", description: "Which tab to switch to (0 = first tab)" },
           },
           required: ["index"],
         },
       },
+
       {
-        name: "captureScreenshot",
-        description: "Take a screenshot of the visible area of the current tab. Returns a base64 image.",
+        name: "readPageContent",
+        description: "Read the current page to see all the buttons, links, inputs, and other things the user can interact with.",
         parameters: { type: "object", properties: {} },
       },
       {
-        name: "getAccessibilitySnapshot",
-        description: "Get the accessibility tree of the current page. Returns a structured text description of all interactive elements with their roles, names, and selectors.",
-        parameters: { type: "object", properties: {} },
-      },
-      {
-        name: "findElements",
-        description: "Find elements on the page matching a text query or CSS selector.",
+        name: "findOnPage",
+        description: "Search for something on the page by its text or by a specific selector.",
         parameters: {
           type: "object",
           properties: {
-            query: { type: "string", description: "Text content or CSS selector to search for" },
-            type: { type: "string", description: "Search type: 'text' or 'selector' (default: text)" },
+            query: { type: "string", description: "What to search for — text or a CSS selector" },
+            type: { type: "string", description: "How to search: 'text' (default) or 'selector'" },
           },
           required: ["query"],
         },
       },
       {
-        name: "clickElement",
-        description: "Click an element on the page by CSS selector.",
+        name: "clickOn",
+        description: "Click on something on the page.",
         parameters: {
           type: "object",
           properties: {
-            selector: { type: "string", description: "CSS selector of the element to click" },
+            selector: { type: "string", description: "Which element to click (CSS selector)" },
           },
           required: ["selector"],
         },
       },
       {
-        name: "fillInput",
-        description: "Type text into an input field identified by CSS selector.",
+        name: "typeInto",
+        description: "Type text into a field on the page.",
         parameters: {
           type: "object",
           properties: {
-            selector: { type: "string", description: "CSS selector of the input" },
-            value: { type: "string", description: "Text to type" },
+            selector: { type: "string", description: "Which field to type into (CSS selector)" },
+            value: { type: "string", description: "What to type" },
           },
           required: ["selector", "value"],
         },
       },
       {
         name: "pressKey",
-        description: "Press a keyboard key (Enter, Tab, Escape, etc).",
+        description: "Press a key on the keyboard, like Enter, Tab, or Escape.",
         parameters: {
           type: "object",
           properties: {
-            key: { type: "string", description: "Key to press (e.g. 'Enter', 'Tab', 'Escape')" },
+            key: { type: "string", description: "Which key to press (e.g. 'Enter', 'Tab', 'Escape')" },
           },
           required: ["key"],
         },
       },
       {
         name: "scrollDown",
-        description: "Scroll down on the page.",
+        description: "Scroll down the page to see more content below.",
         parameters: {
           type: "object",
           properties: {
-            pixels: { type: "number", description: "Pixels to scroll (default: 500)" },
+            pixels: { type: "number", description: "How far to scroll (default: 500)" },
           },
         },
       },
       {
         name: "scrollUp",
-        description: "Scroll up on the page.",
+        description: "Scroll up the page to see content above.",
         parameters: {
           type: "object",
           properties: {
-            pixels: { type: "number", description: "Pixels to scroll (default: 500)" },
+            pixels: { type: "number", description: "How far to scroll (default: 500)" },
           },
+        },
+      },
+      {
+        name: "scrollTo",
+        description: "Scroll to a specific thing on the page so the user can see it.",
+        parameters: {
+          type: "object",
+          properties: {
+            selector: { type: "string", description: "Which element to scroll to (CSS selector)" },
+            text: { type: "string", description: "Or search by text content instead" },
+          },
+        },
+      },
+      {
+        name: "highlight",
+        description: "Highlight something on the page to show the user what you found. Shows a yellow outline around it.",
+        parameters: {
+          type: "object",
+          properties: {
+            selector: { type: "string", description: "Which element to highlight (CSS selector)" },
+            label: { type: "string", description: "Optional label to show next to it" },
+            duration: { type: "number", description: "How long to show it in milliseconds (default: 3000)" },
+          },
+          required: ["selector"],
         },
       },
     ],
@@ -187,15 +207,7 @@ async function executeToolInternal(
       return { success: true, result: `Switched to tab ${index}: ${tabs[index].title}` };
     }
 
-    case "captureScreenshot": {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) return { success: false, error: "No active tab" };
-      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId!, { format: "jpeg", quality: 60 });
-      const base64 = dataUrl.replace(/^data:image\/jpeg;base64,/, "");
-      return { success: true, result: `Screenshot captured (${Math.round(base64.length / 1024)}KB). Image data is being sent to you.`, _imageData: base64, _imageMimeType: "image/jpeg" };
-    }
-
-    case "getAccessibilitySnapshot": {
+    case "readPageContent": {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
       const results = await chrome.scripting.executeScript({
@@ -222,7 +234,7 @@ async function executeToolInternal(
       return { success: true, result: results[0]?.result || "No elements found" };
     }
 
-    case "findElements": {
+    case "findOnPage": {
       const query = args.query as string;
       const type = (args.type as string) || "text";
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -255,7 +267,7 @@ async function executeToolInternal(
       return { success: true, result: results[0]?.result || "No results" };
     }
 
-    case "clickElement": {
+    case "clickOn": {
       const selector = args.selector as string;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
@@ -268,10 +280,10 @@ async function executeToolInternal(
         },
         args: [selector],
       });
-      return { success: true, result: `Clicked ${selector}` };
+      return { success: true, result: `Clicked on ${selector}` };
     }
 
-    case "fillInput": {
+    case "typeInto": {
       const selector = args.selector as string;
       const value = args.value as string;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -288,7 +300,7 @@ async function executeToolInternal(
         },
         args: [selector, value],
       });
-      return { success: true, result: `Filled ${selector} with "${value}"` };
+      return { success: true, result: `Typed "${value}" into ${selector}` };
     }
 
     case "pressKey": {
@@ -332,6 +344,77 @@ async function executeToolInternal(
         args: [pixels],
       });
       return { success: true, result: `Scrolled up ${pixels}px` };
+    }
+
+    case "scrollTo": {
+      const selector = args.selector as string | undefined;
+      const text = args.text as string | undefined;
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return { success: false, error: "No active tab" };
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (sel: string | undefined, txt: string | undefined) => {
+          let el: Element | null = null;
+          if (sel) {
+            el = document.querySelector(sel);
+          }
+          if (!el && txt) {
+            const all = document.querySelectorAll("*");
+            const lower = txt.toLowerCase();
+            for (const node of all) {
+              const innerText = (node as HTMLElement).innerText?.toLowerCase() || "";
+              if (innerText.includes(lower) && node.children.length === 0) {
+                el = node;
+                break;
+              }
+            }
+          }
+          if (!el) return "Element not found";
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          return `Scrolled to: ${(el as HTMLElement).innerText?.slice(0, 60) || el.tagName}`;
+        },
+        args: [selector, text],
+      });
+      const msg = results[0]?.result;
+      if (msg === "Element not found") return { success: false, error: msg };
+      return { success: true, result: msg };
+    }
+
+    case "highlight": {
+      const selector = args.selector as string;
+      const label = (args.label as string) || "";
+      const duration = (args.duration as number) || 3000;
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return { success: false, error: "No active tab" };
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (sel: string, lbl: string, dur: number) => {
+          const el = document.querySelector(sel) as HTMLElement | null;
+          if (!el) throw new Error(`Element not found: ${sel}`);
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          const prev = el.style.cssText;
+          el.style.outline = "3px solid #facc15";
+          el.style.outlineOffset = "2px";
+          el.style.backgroundColor = "rgba(250, 204, 21, 0.15)";
+          el.style.transition = "outline 0.3s, background-color 0.3s";
+          let labelEl: HTMLElement | null = null;
+          if (lbl) {
+            labelEl = document.createElement("div");
+            labelEl.textContent = lbl;
+            labelEl.style.cssText = "position:absolute;z-index:999999;background:#facc15;color:#000;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;";
+            const rect = el.getBoundingClientRect();
+            labelEl.style.top = (window.scrollY + rect.top - 24) + "px";
+            labelEl.style.left = (window.scrollX + rect.left) + "px";
+            document.body.appendChild(labelEl);
+          }
+          setTimeout(() => {
+            el.style.cssText = prev;
+            if (labelEl) labelEl.remove();
+          }, dur);
+        },
+        args: [selector, label, duration],
+      });
+      return { success: true, result: `Highlighted ${selector}${label ? ` — "${label}"` : ""}` };
     }
 
     default:
