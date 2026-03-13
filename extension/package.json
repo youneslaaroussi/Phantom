@@ -33,7 +33,6 @@
       "storage",
       "scripting",
       "tabs",
-      "tabCapture",
       "tabCapture"
     ],
     "content_security_policy": {
