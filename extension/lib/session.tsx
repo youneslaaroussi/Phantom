@@ -32,12 +32,15 @@ const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 const TOOL_GUIDELINES = `
 
 Guidelines:
-- When asked to do something on a page, use getAccessibilitySnapshot first to understand the layout
+- When asked to do something on a page, use readPageContent first to understand the layout
 - After clicking or filling, briefly confirm what you did
 - If something fails, explain what went wrong and try an alternative approach
 - Don't read long text aloud — summarize it instead
 - Keep responses SHORT — the user is listening, not reading. 1-2 sentences max unless they ask for detail.
-- You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.`;
+- You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.
+- For most web interactions, use clickOn/typeInto with CSS selectors — it's faster and more reliable.
+- Use computerAction (AI vision clicking) when CSS selectors won't work: canvas elements, complex UIs, iframes, images, video players, or when you can see something on screen but can't find a selector for it.
+- computerAction takes a screenshot, uses AI vision to find coordinates, and clicks/types at exact positions.`;
 
 const VISION_ON_ADDENDUM = `
 
