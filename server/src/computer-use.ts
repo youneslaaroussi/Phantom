@@ -1,10 +1,13 @@
 /**
  * Computer Use API endpoint
- * 
- * Receives a screenshot + task from the extension,
- * calls Gemini's Computer Use model, and returns planned actions.
- * 
- * The model operates on a 1000x1000 coordinate grid.
+ *
+ * Two modes:
+ * 1. Native Computer Use tool (gemini-3-flash-preview) — uses the proper
+ *    computerUse tool API with click_at/type_text/etc function calls
+ * 2. Vision fallback (any model with vision) — sends screenshot + prompt,
+ *    asks for JSON coordinates. Works with gemini-2.5-flash, 2.0-flash, etc.
+ *
+ * The client doesn't need to care which mode is used.
  */
 
 import { GoogleGenAI } from "@google/genai";
@@ -42,7 +45,7 @@ interface ComputerUseAction {
 interface ComputerUseRequest {
   model: string;
   task: string;
-  screenshot: string; // base64
+  screenshot: string;
   mimeType: string;
 }
 
@@ -51,7 +54,17 @@ interface ComputerUseResponse {
   actions: ComputerUseAction[];
   reasoning?: string;
   error?: string;
+  mode?: "native" | "vision";
 }
+
+// Models that support native Computer Use tool
+const NATIVE_CU_MODELS = [
+  "gemini-3-flash-preview",
+  "gemini-3-pro-preview",
+];
+
+// Fallback vision model for coordinate extraction
+const VISION_FALLBACK_MODEL = "gemini-2.5-flash";
 
 export async function handleComputerUse(req: ComputerUseRequest): Promise<ComputerUseResponse> {
   const apiKey = nextApiKey();
@@ -59,129 +72,184 @@ export async function handleComputerUse(req: ComputerUseRequest): Promise<Comput
     return { success: false, actions: [], error: "No API key configured" };
   }
 
-  const ai = new GoogleGenAI({ apiKey });
-  const model = req.model || "gemini-3-flash-preview";
+  const requestedModel = req.model || "gemini-3-flash-preview";
 
+  // Try native Computer Use first if the model supports it
+  if (NATIVE_CU_MODELS.includes(requestedModel)) {
+    try {
+      const result = await tryNativeComputerUse(apiKey, requestedModel, req);
+      if (result.success) return result;
+      console.log("[computer-use] Native CU failed, falling back to vision:", result.error);
+    } catch (err: any) {
+      console.log("[computer-use] Native CU error, falling back:", err.message);
+    }
+  }
+
+  // Fallback: vision-based coordinate extraction
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              inlineData: {
-                data: req.screenshot,
-                mimeType: req.mimeType,
-              },
-            },
-            {
-              text: `You are a computer use agent. Look at this screenshot and perform the following task:
-
-${req.task}
-
-Respond with a JSON object containing:
-- "reasoning": brief explanation of what you see and what you'll do
-- "actions": array of actions to perform
-
-Each action has:
-- "type": one of "click", "doubleClick", "type", "scroll", "drag", "keyPress", "hover", "wait"
-- "x", "y": coordinates on a 1000x1000 grid (for click, doubleClick, hover, drag)
-- "endX", "endY": end coordinates for drag
-- "text": text to type (for type action)
-- "key": key name (for keyPress, e.g. "Enter", "Tab", "Escape", "Backspace")
-- "direction": "up", "down", "left", "right" (for scroll)
-- "amount": pixels to scroll (for scroll, default 500)
-- "delayMs": milliseconds to wait after this action (for wait, or delay between actions)
-
-Coordinates use a 1000x1000 grid where (0,0) is top-left and (1000,1000) is bottom-right.
-
-IMPORTANT: Respond with ONLY the JSON object, no markdown or code blocks.`,
-            },
-          ],
-        },
-      ],
-      config: {
-        tools: [{ computerUse: {} }],
-      },
-    } as any);
-
-    // Parse the response — model might return computer use function calls or text
-    const result = parseComputerUseResponse(response);
-    return result;
+    return await tryVisionFallback(apiKey, VISION_FALLBACK_MODEL, req);
   } catch (err: any) {
-    console.error("[computer-use] API error:", err.message);
-    return { success: false, actions: [], error: err.message };
+    // Last resort: try with the requested model without CU tool
+    try {
+      return await tryVisionFallback(apiKey, requestedModel, req);
+    } catch (err2: any) {
+      return { success: false, actions: [], error: `All methods failed. Last error: ${err2.message}` };
+    }
   }
 }
 
-function parseComputerUseResponse(response: any): ComputerUseResponse {
-  // Check for function calls (native computer use tool responses)
+// ─── Native Computer Use (Gemini 3 models) ───
+
+async function tryNativeComputerUse(
+  apiKey: string,
+  model: string,
+  req: ComputerUseRequest
+): Promise<ComputerUseResponse> {
+  const ai = new GoogleGenAI({ apiKey });
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              data: req.screenshot,
+              mimeType: req.mimeType,
+            },
+          },
+          { text: req.task },
+        ],
+      },
+    ],
+    config: {
+      tools: [
+        {
+          computerUse: {
+            environment: "ENVIRONMENT_BROWSER",
+          },
+        } as any,
+      ],
+    },
+  } as any);
+
+  // Parse native function calls
   const candidates = response.candidates || [];
+  const actions: ComputerUseAction[] = [];
+  let reasoning = "";
+
   for (const candidate of candidates) {
     const parts = candidate.content?.parts || [];
-    
-    const actions: ComputerUseAction[] = [];
-    let reasoning = "";
-
     for (const part of parts) {
-      // Text part — might contain reasoning
-      if (part.text) {
-        // Try to parse as JSON first
-        try {
-          const cleaned = part.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-          const parsed = JSON.parse(cleaned);
-          if (parsed.actions) {
-            return {
-              success: true,
-              actions: parsed.actions,
-              reasoning: parsed.reasoning || "",
-            };
-          }
-        } catch {
-          reasoning += part.text;
-        }
-      }
-
-      // Native computer use function calls
-      if (part.functionCall) {
-        const fc = part.functionCall;
-        const action = mapFunctionCallToAction(fc);
+      if (part.text) reasoning += part.text;
+      if ((part as any).functionCall) {
+        const action = mapNativeFunctionCall((part as any).functionCall);
         if (action) actions.push(action);
-      }
-
-      // Executable code responses (some models return this way)
-      if (part.executableCode) {
-        reasoning += `Code: ${part.executableCode.code}`;
-      }
-    }
-
-    if (actions.length > 0) {
-      return { success: true, actions, reasoning };
-    }
-
-    // If we got reasoning but no structured actions, try parsing reasoning as JSON
-    if (reasoning) {
-      try {
-        const cleaned = reasoning.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-        const parsed = JSON.parse(cleaned);
-        if (parsed.actions) {
-          return {
-            success: true,
-            actions: parsed.actions,
-            reasoning: parsed.reasoning || "",
-          };
-        }
-      } catch {
-        // Not JSON — return as-is
       }
     }
   }
 
-  return { success: false, actions: [], error: "No actions found in response" };
+  if (actions.length === 0 && !reasoning) {
+    return { success: false, actions: [], error: "No actions from native CU" };
+  }
+
+  return { success: true, actions, reasoning, mode: "native" };
 }
 
-function mapFunctionCallToAction(fc: any): ComputerUseAction | null {
+// ─── Vision Fallback (any model with vision) ───
+
+async function tryVisionFallback(
+  apiKey: string,
+  model: string,
+  req: ComputerUseRequest
+): Promise<ComputerUseResponse> {
+  const ai = new GoogleGenAI({ apiKey });
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              data: req.screenshot,
+              mimeType: req.mimeType,
+            },
+          },
+          {
+            text: `Look at this screenshot carefully. I need you to help me: ${req.task}
+
+Return a JSON object (no markdown, no code blocks) with:
+{
+  "reasoning": "brief description of what you see and what to do",
+  "actions": [
+    {
+      "type": "click",
+      "x": <number 0-1000>,
+      "y": <number 0-1000>
+    }
+  ]
+}
+
+Coordinate system: 1000x1000 grid. (0,0) = top-left, (1000,1000) = bottom-right.
+Action types: click, doubleClick, type, scroll, keyPress, hover, drag, wait.
+For "type": include "text" field. For "keyPress": include "key" field.
+For "scroll": include "direction" (up/down/left/right).
+For "drag": include "endX" and "endY".
+
+IMPORTANT: Return ONLY the JSON object. No explanation, no markdown.`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  // Try to parse JSON from response
+  try {
+    const cleaned = text
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim();
+    const parsed = JSON.parse(cleaned);
+
+    if (parsed.actions && Array.isArray(parsed.actions)) {
+      return {
+        success: true,
+        actions: parsed.actions,
+        reasoning: parsed.reasoning || "",
+        mode: "vision",
+      };
+    }
+  } catch {
+    // Try to extract JSON from mixed text
+    const jsonMatch = text.match(/\{[\s\S]*"actions"[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          success: true,
+          actions: parsed.actions || [],
+          reasoning: parsed.reasoning || "",
+          mode: "vision",
+        };
+      } catch {}
+    }
+  }
+
+  return {
+    success: false,
+    actions: [],
+    error: `Could not parse actions from model response: ${text.slice(0, 200)}`,
+  };
+}
+
+// ─── Helpers ───
+
+function mapNativeFunctionCall(fc: any): ComputerUseAction | null {
   const name = fc.name || "";
   const args = fc.args || {};
 
@@ -198,14 +266,24 @@ function mapFunctionCallToAction(fc: any): ComputerUseAction | null {
     case "key_press":
       return { type: "keyPress", key: args.key };
     case "scroll":
-      return { type: "scroll", direction: args.direction || "down", amount: args.amount || 500 };
+      return {
+        type: "scroll",
+        direction: args.direction || "down",
+        amount: args.amount || 500,
+      };
     case "drag":
     case "drag_to":
-      return { type: "drag", x: args.startX || args.x, y: args.startY || args.y, endX: args.endX, endY: args.endY };
+      return {
+        type: "drag",
+        x: args.startX || args.x,
+        y: args.startY || args.y,
+        endX: args.endX,
+        endY: args.endY,
+      };
     case "wait":
       return { type: "wait", delayMs: args.ms || args.delayMs || 1000 };
     default:
-      console.warn("[computer-use] Unknown function call:", name);
+      console.warn("[computer-use] Unknown native function:", name);
       return null;
   }
 }
