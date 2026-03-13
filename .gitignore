@@ -1,0 +1,8 @@
+node_modules/
+build/
+dist/
+.plasmo/
+*.DS_Store
+.env
+.env.local
+mascots/tmp_gen/

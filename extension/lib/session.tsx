@@ -19,8 +19,7 @@ import React, {
 } from "react";
 import { LiveSession } from "./live/client";
 import { getToolDeclarations, executeTool } from "./tools";
-import { getApiKey } from "./api-key";
-import { getConnectionMode, getServerUrl, type ConnectionMode } from "./connection-mode";
+import { getServerUrl } from "./connection-mode";
 import { startVision, stopVision, isVisionActive } from "./vision";
 import { getSavedMicId } from "../components/mic-selector";
 import { startSession as startTrace, endSession as endTrace, addTrace } from "./trace";
@@ -71,8 +70,6 @@ interface SessionContextValue {
   setVoice: (v: LiveVoiceName) => void;
   persona: Persona;
   setPersonaId: (id: string) => void;
-  hasApiKey: boolean;
-  checkApiKey: () => Promise<boolean>;
   /** Whether vision (screen streaming) is enabled */
   visionEnabled: boolean;
   /** Toggle vision on/off */
@@ -94,8 +91,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [outputLevel, setOutputLevel] = useState(0);
   const [voice, setVoiceState] = useState<LiveVoiceName>("Kore");
   const [persona, setPersonaState] = useState<Persona>(getPersona("default"));
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [connectionMode, setConnectionModeState] = useState<ConnectionMode>("byok");
   const [visionEnabled, setVisionEnabledState] = useState(false);
 
   useEffect(() => {
@@ -104,8 +99,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       setPersonaState(p);
       setVoiceState(p.voice);
     });
-    getApiKey().then((k) => setHasApiKey(!!k));
-    getConnectionMode().then(setConnectionModeState);
   }, []);
 
   const setVoice = useCallback((v: LiveVoiceName) => {
@@ -127,21 +120,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const checkApiKey = useCallback(async () => {
-    const k = await getApiKey();
-    setHasApiKey(!!k);
-    return !!k;
-  }, []);
-
   const connect = useCallback(async () => {
-    const mode = await getConnectionMode();
-    const apiKey = await getApiKey();
-
-    if (mode === "byok" && !apiKey) {
-      setState((p) => ({ ...p, status: "error", error: "No API key. Add one in settings." }));
-      return;
-    }
-
     if (sessionRef.current) {
       sessionRef.current.disconnect();
       sessionRef.current = null;
@@ -194,17 +173,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     sessionRef.current = session;
     startTrace();
-    addTrace("system", `Connecting (${mode}) with model ${MODEL}, voice ${voice}`);
+    addTrace("system", `Connecting with model ${MODEL}, voice ${voice}`);
 
     try {
-      if (mode === "hosted") {
-        const serverUrl = await getServerUrl();
-        const wsUrl = serverUrl.replace(/\/$/, "") + "/ws/live";
-        await session.connect({ proxyUrl: wsUrl });
-      } else {
-        await session.connect({ apiKey: apiKey! });
-        setHasApiKey(true);
-      }
+      const serverUrl = await getServerUrl();
+      const wsUrl = serverUrl.replace(/\/$/, "") + "/ws/live";
+      await session.connect({ proxyUrl: wsUrl });
       addTrace("system", "Connected");
       playConnect();
     } catch (err) {
@@ -236,7 +210,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       startVision((base64, mimeType) => {
         addTrace("vision_frame", "frame sent");
         sessionRef.current?.sendImage(base64, mimeType);
-      });
+      }, persona.image);
       sessionRef.current?.sendText("[SYSTEM] You can now see the user's screen. You'll receive a live view updated every second. Describe only what you actually see.");
     } else {
       playVisionOff();
@@ -253,7 +227,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (visionEnabled && state.status === "connected" && sessionRef.current) {
       startVision((base64, mimeType) => {
         sessionRef.current?.sendImage(base64, mimeType);
-      });
+      }, persona.image);
     } else {
       stopVision();
     }
@@ -325,8 +299,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setVoice,
         persona,
         setPersonaId,
-        hasApiKey,
-        checkApiKey,
         visionEnabled,
         setVisionEnabled,
       }}

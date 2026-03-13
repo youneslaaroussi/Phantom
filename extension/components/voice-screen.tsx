@@ -11,7 +11,7 @@ import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
 import { MarkdownText } from "./markdown";
 import { AnimatedMascot } from "./animated-mascot";
-import { getConnectionMode, type ConnectionMode } from "../lib/connection-mode";
+
 import type { LiveVoiceName } from "../lib/live/types";
 
 interface VoiceScreenProps {
@@ -40,19 +40,6 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
   } = useSession();
 
   const [textInput, setTextInput] = useState("");
-
-  const [connectionMode, setConnectionMode] = useState<ConnectionMode | null>(null);
-
-  useEffect(() => {
-    getConnectionMode().then(setConnectionMode);
-    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes["phantom_connection_mode"]) {
-        setConnectionMode(changes["phantom_connection_mode"].newValue as ConnectionMode);
-      }
-    };
-    chrome.storage.local.onChanged.addListener(listener);
-    return () => chrome.storage.local.onChanged.removeListener(listener);
-  }, []);
 
   const isConnected = state.status === "connected";
   const isConnecting = state.status === "connecting";
@@ -103,15 +90,6 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
         <div className="flex items-center gap-2">
           <img src={chrome.runtime.getURL("assets/" + persona.image)} alt="" className="w-5 h-5" style={{ imageRendering: "pixelated" as const }} />
           <span className="font-mono text-xs tracking-widest text-gray-500">{persona.name.toUpperCase()}</span>
-          {connectionMode && (
-            <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded ${
-              connectionMode === "hosted"
-                ? "bg-blue-500/15 text-blue-400"
-                : "bg-amber-500/15 text-amber-400"
-            }`}>
-              {connectionMode === "hosted" ? "PROXY" : "BYOK"}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -157,6 +135,7 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
               : isConnected ? "idle"
               : "sleeping"
             }
+            personaId={persona.id}
             size={80}
           />
         </div>
