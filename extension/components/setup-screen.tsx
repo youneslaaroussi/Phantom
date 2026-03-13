@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Key, ArrowRight, Eye, EyeOff, ExternalLink, Globe, Mic, ChevronRight, ChevronLeft } from "lucide-react";
-import { saveApiKey, isValidKeyFormat } from "../lib/api-key";
-import { setConnectionMode } from "../lib/connection-mode";
+import { Mic, ChevronRight, ChevronLeft } from "lucide-react";
 import { useSession } from "../lib/session";
 import { MicSelector } from "./mic-selector";
 import { playWake, playConnect } from "../lib/sounds";
@@ -11,41 +9,25 @@ interface SetupScreenProps {
   onComplete: () => void;
 }
 
-type Step = "meet" | "persona" | "connect" | "mic";
-const STEPS: Step[] = ["meet", "persona", "connect", "mic"];
+type Step = "meet" | "persona" | "mic";
+const STEPS: Step[] = ["meet", "persona", "mic"];
 
 export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
-  const { checkApiKey, setPersonaId } = useSession();
+  const { setPersonaId } = useSession();
   const [step, setStep] = useState<Step>("meet");
   const [selectedPersona, setSelectedPersona] = useState<Persona>(PERSONAS[0]);
-  const [apiKey, setApiKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => { playWake(); }, []);
-
-  const handleHosted = async () => {
-    await setConnectionMode("hosted");
-    playConnect();
-    setStep("mic");
-  };
-
-  const handleByok = async () => {
-    const trimmed = apiKey.trim();
-    if (!trimmed) { setError("Paste your API key here"); return; }
-    if (!isValidKeyFormat(trimmed)) { setError("Should start with AIza..."); return; }
-    setError("");
-    await saveApiKey(trimmed);
-    await setConnectionMode("byok");
-    await checkApiKey();
-    playConnect();
-    setStep("mic");
-  };
 
   const handlePersonaPick = async (p: Persona) => {
     setSelectedPersona(p);
     await savePersonaId(p.id);
     await setPersonaId(p.id);
+  };
+
+  const handleComplete = () => {
+    playConnect();
+    onComplete();
   };
 
   const stepIdx = STEPS.indexOf(step);
@@ -146,7 +128,7 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
               <ChevronLeft className="w-3.5 h-3.5" /> Back
             </button>
             <button
-              onClick={() => setStep("connect")}
+              onClick={() => setStep("mic")}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-sm transition-all"
               style={{ background: "#67e8f9", color: "#0a0a12" }}
             >
@@ -156,97 +138,6 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
           </div>
 
           {dots}
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "connect") {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center px-8" style={{ background: "#0a0a12", color: "#e2e8f0" }}>
-        <div className="max-w-sm w-full space-y-6">
-          <div className="text-center space-y-2">
-            <img
-              src={chrome.runtime.getURL("assets/" + selectedPersona.image)}
-              alt=""
-              className="w-14 h-14 mx-auto mb-2"
-              style={{ imageRendering: "pixelated", filter: "drop-shadow(0 0 12px rgba(103,232,249,0.3))" }}
-            />
-            <h1 className="text-lg font-bold tracking-tight">How should {selectedPersona.name} connect?</h1>
-            <p className="text-xs" style={{ color: "#64748b" }}>Pick one. You can change this later.</p>
-          </div>
-
-          <div className="space-y-3">
-            <button
-              onClick={handleHosted}
-              className="w-full py-4 px-5 rounded-xl text-left transition-all border"
-              style={{ background: "rgba(99,102,241,0.08)", borderColor: "rgba(99,102,241,0.2)" }}
-            >
-              <div className="flex items-center gap-3">
-                <Globe className="w-5 h-5 shrink-0" style={{ color: "#67e8f9" }} />
-                <div>
-                  <div className="font-medium text-sm">Use hosted</div>
-                  <div className="text-xs mt-0.5" style={{ color: "#64748b" }}>No API key needed.</div>
-                </div>
-              </div>
-            </button>
-
-            <div className="w-full py-4 px-5 rounded-xl border space-y-3" style={{ background: "rgba(30,27,75,0.3)", borderColor: "rgba(99,102,241,0.15)" }}>
-              <div className="flex items-center gap-3">
-                <Key className="w-5 h-5 shrink-0" style={{ color: "#a855f7" }} />
-                <div>
-                  <div className="font-medium text-sm">Bring your own key</div>
-                  <div className="text-xs mt-0.5" style={{ color: "#64748b" }}>Use your Gemini API key directly.</div>
-                </div>
-              </div>
-
-              <div className="relative">
-                <input
-                  type={showKey ? "text" : "password"}
-                  value={apiKey}
-                  onChange={(e) => { setApiKey(e.target.value); setError(""); }}
-                  placeholder="AIza..."
-                  className="w-full rounded-lg px-4 py-2.5 text-xs font-mono focus:outline-none pr-10 transition-colors"
-                  style={{ background: "rgba(10,10,18,0.8)", border: "1px solid rgba(99,102,241,0.15)", color: "#e2e8f0" }}
-                  onKeyDown={(e) => e.key === "Enter" && handleByok()}
-                />
-                <button
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
-                  style={{ color: "#64748b" }}
-                >
-                  {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              {error && <p className="text-xs" style={{ color: "#f87171" }}>{error}</p>}
-
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => chrome.tabs.create({ url: "https://aistudio.google.com/apikey" })}
-                  className="text-[10px] flex items-center gap-1 hover:opacity-80"
-                  style={{ color: "#67e8f9" }}
-                >
-                  Get a free key <ExternalLink className="w-2.5 h-2.5" />
-                </button>
-                <button
-                  onClick={handleByok}
-                  className="px-4 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: "#a855f7", color: "white" }}
-                >
-                  Connect
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <button onClick={() => setStep("persona")} className="w-full text-center text-xs" style={{ color: "#64748b" }}>
-            <ChevronLeft className="w-3 h-3 inline mr-1" />Back
-          </button>
-
-          {dots}
-
-          <p className="text-center text-[10px]" style={{ color: "#334155" }}>Your key stays on your device.</p>
         </div>
       </div>
     );
@@ -272,7 +163,7 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
         </div>
 
         <button
-          onClick={onComplete}
+          onClick={handleComplete}
           className="flex items-center gap-2 px-6 py-3 rounded-xl font-medium text-sm transition-all"
           style={{ background: "#67e8f9", color: "#0a0a12" }}
         >

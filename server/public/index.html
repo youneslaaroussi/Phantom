@@ -59,7 +59,7 @@
       color: var(--text);
     }
 
-    .logo img { width: 24px; height: 24px; image-rendering: pixelated; }
+    .logo img { width: 36px; height: 36px; image-rendering: pixelated; }
 
     .nav-links { display: flex; gap: 8px; }
 
@@ -121,8 +121,8 @@
     }
 
     .mascot-float img {
-      width: 96px;
-      height: 96px;
+      width: 140px;
+      height: 140px;
       image-rendering: pixelated;
       filter: drop-shadow(0 0 24px rgba(103,232,249,0.4)) drop-shadow(0 0 48px rgba(99,102,241,0.2));
     }
@@ -141,10 +141,8 @@
     }
 
     .hero h1 .accent {
-      background: linear-gradient(135deg, var(--phantom-cyan), var(--phantom-indigo), var(--phantom-purple));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--phantom-cyan);
+      text-shadow: 0 0 40px rgba(103,232,249,0.4), 0 0 80px rgba(99,102,241,0.2);
     }
 
     .hero p {
@@ -450,6 +448,22 @@
             <p>No local models, no downloads. Just an API key and you're live.</p>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="features" style="text-align:center">
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);margin-bottom:20px">
+        <i data-lucide="shield-check" style="width:16px;height:16px;color:#34d399"></i>
+        <span style="font-size:12px;font-weight:600;color:#34d399;letter-spacing:0.05em;text-transform:uppercase">Privacy First</span>
+      </div>
+      <h2 style="margin-bottom:12px">Privacy Shield</h2>
+      <p style="color:var(--muted);max-width:480px;margin:0 auto 32px;font-size:15px;line-height:1.6">Phantom sees your screen — but never your secrets. Passwords, credit cards, API keys, and SSNs are automatically blurred before every frame reaches the AI.</p>
+
+      <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+        <span class="tag"><i data-lucide="lock" style="width:14px;height:14px;color:#34d399"></i> Zero latency</span>
+        <span class="tag"><i data-lucide="wifi-off" style="width:14px;height:14px;color:#34d399"></i> No API calls</span>
+        <span class="tag"><i data-lucide="scan-eye" style="width:14px;height:14px;color:#34d399"></i> DOM + regex scanning</span>
+        <span class="tag"><i data-lucide="eye-off" style="width:14px;height:14px;color:#34d399"></i> User never sees blur</span>
       </div>
     </section>
 

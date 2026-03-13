@@ -1,4 +1,4 @@
-export const SHOW_INDICATOR_SCRIPT = () => {
+export const SHOW_INDICATOR_SCRIPT = (imgUrl: string) => {
   var ID = "__phantom_vision_indicator";
   var existing = document.getElementById(ID);
   if (existing) existing.remove();
@@ -9,25 +9,17 @@ export const SHOW_INDICATOR_SCRIPT = () => {
 
   var wisp = document.createElement("div");
   wisp.id = "__phantom_wisp";
-  wisp.style.cssText = "position:fixed;width:32px;height:32px;pointer-events:none;z-index:2147483647;will-change:left,top;filter:drop-shadow(0 0 8px rgba(103,232,249,0.5)) drop-shadow(0 0 16px rgba(99,102,241,0.3));";
-  wisp.innerHTML = '<img src="' + (typeof chrome !== "undefined" && chrome.runtime ? chrome.runtime.getURL("assets/mascot.png") : "/mascot.png") + '" style="width:32px;height:32px;image-rendering:pixelated;" />';
+  wisp.style.cssText = "position:fixed;width:80px;height:80px;pointer-events:none;z-index:2147483647;will-change:left,top,transform;filter:drop-shadow(0 0 12px rgba(103,232,249,0.5)) drop-shadow(0 0 24px rgba(99,102,241,0.3));transition:filter 0.3s;";
+  wisp.innerHTML = '<img src="' + imgUrl + '" style="width:80px;height:80px;image-rendering:pixelated;" />';
   el.appendChild(wisp);
-
-  var trail = document.createElement("div");
-  trail.id = "__phantom_trail";
-  trail.style.cssText = "position:fixed;width:16px;height:16px;border-radius:50%;pointer-events:none;z-index:2147483646;background:radial-gradient(circle,rgba(103,232,249,0.3),rgba(99,102,241,0.05));filter:blur(4px);will-change:left,top;";
-  el.appendChild(trail);
-
-  var style = document.createElement("style");
-  style.textContent = "@keyframes __pw{0%,100%{transform:scaleY(1)}50%{transform:scaleY(0.85)}}";
-  el.appendChild(style);
 
   document.body.appendChild(el);
 
   var mouseX = window.innerWidth - 60;
   var mouseY = 40;
   var wispX = mouseX, wispY = mouseY;
-  var trailX = mouseX, trailY = mouseY;
+  var prevX = wispX, prevY = wispY;
+  var velX = 0, velY = 0;
   var idle = true;
   var idleAngle = 0;
   var idleTimer = 0;
@@ -46,24 +38,44 @@ export const SHOW_INDICATOR_SCRIPT = () => {
     idleTimer++;
     if (idleTimer > 90) idle = true;
 
-    var tx = mouseX + 22;
-    var ty = mouseY - 22;
+    var tx = mouseX + 28;
+    var ty = mouseY - 28;
 
     if (idle) {
       idleAngle += 0.02;
-      tx = mouseX + 22 + Math.sin(idleAngle) * 8;
-      ty = mouseY - 22 + Math.cos(idleAngle * 0.7) * 5 + Math.sin(idleAngle * 1.5) * 3;
+      tx = mouseX + 28 + Math.sin(idleAngle) * 10;
+      ty = mouseY - 28 + Math.cos(idleAngle * 0.7) * 6 + Math.sin(idleAngle * 1.5) * 4;
     }
 
-    wispX += (tx - wispX) * 0.14;
-    wispY += (ty - wispY) * 0.14;
-    trailX += (wispX - trailX) * 0.07;
-    trailY += (wispY - trailY) * 0.07;
+    wispX += (tx - wispX) * 0.12;
+    wispY += (ty - wispY) * 0.12;
 
-    wisp.style.left = (wispX - 16) + "px";
-    wisp.style.top = (wispY - 16) + "px";
-    trail.style.left = (trailX - 8) + "px";
-    trail.style.top = (trailY - 8) + "px";
+    velX = velX * 0.85 + (wispX - prevX) * 0.15;
+    velY = velY * 0.85 + (wispY - prevY) * 0.15;
+    prevX = wispX;
+    prevY = wispY;
+
+    var speed = Math.sqrt(velX * velX + velY * velY);
+    var angle = Math.atan2(velY, velX) * (180 / Math.PI);
+
+    var stretch = 1 + Math.min(speed * 0.04, 0.6);
+    var squash = 1 / Math.sqrt(stretch);
+
+    var wobble = idle ? Math.sin(idleAngle * 3) * 3 : 0;
+    var breathe = 1 + Math.sin(idleAngle * 2) * 0.03;
+
+    var transform;
+    if (speed > 1.5) {
+      transform = "scaleX(" + stretch.toFixed(3) + ") scaleY(" + squash.toFixed(3) + ")";
+      wisp.style.filter = "drop-shadow(0 0 " + Math.min(16 + speed * 2, 40) + "px rgba(103,232,249," + Math.min(0.5 + speed * 0.03, 0.9) + ")) drop-shadow(0 0 " + Math.min(28 + speed * 3, 60) + "px rgba(99,102,241,0.3))";
+    } else {
+      transform = "scale(" + breathe.toFixed(3) + ")";
+      wisp.style.filter = "drop-shadow(0 0 12px rgba(103,232,249,0.5)) drop-shadow(0 0 24px rgba(99,102,241,0.3))";
+    }
+
+    wisp.style.left = (wispX - 40) + "px";
+    wisp.style.top = (wispY - 40) + "px";
+    wisp.style.transform = transform;
 
     requestAnimationFrame(tick);
   };
@@ -79,9 +91,7 @@ export const HIDE_INDICATOR_SCRIPT = () => {
   if (el) {
     if (window.__phantom_eye_cleanup) window.__phantom_eye_cleanup();
     var wisp = document.getElementById("__phantom_wisp");
-    var trail = document.getElementById("__phantom_trail");
-    if (wisp) { wisp.style.transition = "opacity 0.3s ease, transform 0.3s ease"; wisp.style.opacity = "0"; wisp.style.transform = "scale(0)"; }
-    if (trail) { trail.style.transition = "opacity 0.3s ease"; trail.style.opacity = "0"; }
+    if (wisp) { wisp.style.transition = "opacity 0.3s ease, transform 0.3s ease"; wisp.style.opacity = "0"; wisp.style.transform = "scale(0) rotate(180deg)"; }
     setTimeout(function() { if (el) el.remove(); }, 300);
   }
 };

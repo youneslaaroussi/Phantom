@@ -17,10 +17,7 @@ import { AudioCapture, AudioPlayer, arrayBufferToBase64, base64ToArrayBuffer } f
 const LIVE_API_BASE = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 
 export interface ConnectOptions {
-  /** Direct API key (BYOK mode) */
-  apiKey?: string;
-  /** Proxy WebSocket URL (hosted mode) — connects to server that holds the key */
-  proxyUrl?: string;
+  proxyUrl: string;
 }
 
 export class LiveSession {
@@ -50,22 +47,14 @@ export class LiveSession {
       throw new Error("Already connected");
     }
 
-    // Backwards compat: string arg = API key
-    const opts: ConnectOptions = typeof options === "string" ? { apiKey: options } : options;
-
-    if (!opts.apiKey && !opts.proxyUrl) {
-      throw new Error("Provide either apiKey or proxyUrl");
-    }
+    const opts: ConnectOptions = typeof options === "string" ? { proxyUrl: options } : options;
 
     this.setState({ status: "connecting" });
 
     this.audioPlayer = new AudioPlayer();
     await this.audioPlayer.init(this.callbacks.onOutputLevel);
 
-    const url = opts.proxyUrl
-      ? opts.proxyUrl
-      : `${LIVE_API_BASE}?key=${opts.apiKey}`;
-    this.ws = new WebSocket(url);
+    this.ws = new WebSocket(opts.proxyUrl);
 
     return new Promise((resolve, reject) => {
       if (!this.ws) return reject(new Error("WebSocket not initialized"));

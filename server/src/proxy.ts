@@ -1,14 +1,11 @@
 /**
- * Gemini Live WebSocket proxy
- * 
- * Client connects to /ws/live, server relays to Gemini Live API.
- * API key stays server-side. Client never sees it.
+ * Gemini Live proxy using Google GenAI SDK
+ *
+ * Client sends JSON messages over WebSocket.
+ * Server maintains a GenAI Live session and relays between them.
  */
 
-import { WebSocket as WS } from "ws";
-
-const GEMINI_WS_BASE =
-  "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
+import { GoogleGenAI, Modality, type Session } from "@google/genai";
 
 const apiKeys: string[] = (
   process.env.GOOGLE_GENERATIVE_AI_API_KEYS ||
@@ -27,72 +24,126 @@ function nextApiKey(): string | undefined {
   return key;
 }
 
-export function createGeminiProxy(
-  clientWs: { send: (data: string) => void; close: (code?: number, reason?: string) => void },
-  onClose: () => void
-) {
+interface ClientWs {
+  send: (data: string) => void;
+  close: (code?: number, reason?: string) => void;
+}
+
+export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
   const apiKey = nextApiKey();
   if (!apiKey) {
     clientWs.send(JSON.stringify({ error: "Server API key not configured" }));
     clientWs.close(1008, "No API key");
     onClose();
-    return { send: () => {}, close: () => {} };
+    return { send: (_d: string) => {}, close: () => {} };
   }
 
-  const url = `${GEMINI_WS_BASE}?key=${apiKey}`;
-  const upstream = new WS(url, { maxPayload: 10 * 1024 * 1024 });
-
-  let clientOpen = true;
-  let upstreamOpen = false;
+  let session: Session | null = null;
+  let setupReceived = false;
   const buffer: string[] = [];
 
-  upstream.on("open", () => {
-    upstreamOpen = true;
-    // Flush any messages buffered while connecting
-    for (const msg of buffer) {
-      upstream.send(msg);
-    }
-    buffer.length = 0;
-  });
+  async function initSession(setupMsg: Record<string, unknown>) {
+    const ai = new GoogleGenAI({ apiKey });
+    const setup = setupMsg.setup as Record<string, unknown>;
 
-  upstream.on("message", (data) => {
-    const str = data.toString();
-    console.log("[proxy] Upstream message: len=%d preview=%s", str.length, str.slice(0, 150));
-    if (clientOpen) {
-      clientWs.send(str);
+    const config: Record<string, unknown> = {};
+    if (setup.generationConfig) config.responseModalities = (setup.generationConfig as Record<string, unknown>).responseModalities;
+    if (setup.systemInstruction) config.systemInstruction = setup.systemInstruction;
+    if (setup.tools) config.tools = setup.tools;
+    if ((setup.generationConfig as Record<string, unknown>)?.speechConfig) {
+      config.speechConfig = (setup.generationConfig as Record<string, unknown>).speechConfig;
     }
-  });
 
-  upstream.on("close", (code, reason) => {
-    if (clientOpen) {
-      clientWs.close(code, reason.toString());
-      clientOpen = false;
-    }
-    onClose();
-  });
+    const modelName = (setup.model as string || "").replace("models/", "");
 
-  upstream.on("error", (err) => {
-    console.error("[proxy] Upstream error:", err.message);
-    if (clientOpen) {
-      clientWs.close(1011, "Upstream error");
-      clientOpen = false;
+    try {
+      session = await ai.live.connect({
+        model: modelName,
+        config: config as any,
+        callbacks: {
+          onopen() {
+            console.log("[genai] Session opened");
+            clientWs.send(JSON.stringify({ setupComplete: {} }));
+            for (const msg of buffer) {
+              handleClientMessage(msg);
+            }
+            buffer.length = 0;
+          },
+          onmessage(message: any) {
+            clientWs.send(JSON.stringify(message));
+          },
+          onerror(e: any) {
+            console.error("[genai] Error:", e.message || e);
+            clientWs.close(1011, "Gemini error");
+            onClose();
+          },
+          onclose(e: any) {
+            console.log("[genai] Closed:", e.reason || e.code || "");
+            clientWs.close(1000, "Session ended");
+            onClose();
+          },
+        },
+      });
+    } catch (err: any) {
+      console.error("[genai] Connect failed:", err.message);
+      clientWs.send(JSON.stringify({ error: err.message }));
+      clientWs.close(1011, "Connect failed");
+      onClose();
     }
-    onClose();
-  });
+  }
+
+  function handleClientMessage(raw: string) {
+    let msg: Record<string, unknown>;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    if (msg.setup && !setupReceived) {
+      setupReceived = true;
+      initSession(msg);
+      return;
+    }
+
+    if (!session) {
+      buffer.push(raw);
+      return;
+    }
+
+    if (msg.realtimeInput) {
+      const ri = msg.realtimeInput as Record<string, unknown>;
+      if (ri.audio) {
+        session.sendRealtimeInput({ audio: ri.audio as any });
+      }
+      if (ri.video) {
+        session.sendRealtimeInput({ video: ri.video as any });
+      }
+      if (ri.text) {
+        session.sendRealtimeInput({ text: ri.text as string });
+      }
+      return;
+    }
+
+    if (msg.clientContent) {
+      session.sendClientContent(msg.clientContent as any);
+      return;
+    }
+
+    if (msg.toolResponse) {
+      session.sendToolResponse(msg.toolResponse as any);
+      return;
+    }
+  }
 
   return {
     send(data: string) {
-      console.log("[proxy] To upstream: len=%d upstreamOpen=%s preview=%s", data.length, upstreamOpen, data.slice(0, 80));
-      if (upstreamOpen) {
-        upstream.send(data);
-      } else {
-        buffer.push(data);
-      }
+      handleClientMessage(data);
     },
     close() {
-      clientOpen = false;
-      if (upstreamOpen) {
-        upstream.close();
+      if (session) {
+        session.close();
+        session = null;
       }
     },
   };

@@ -4,47 +4,80 @@ type MascotState = "idle" | "listening" | "talking" | "thinking" | "sleeping";
 
 interface AnimatedMascotProps {
   state: MascotState;
+  personaId?: string;
   size?: number;
   className?: string;
 }
 
-const SHEETS: Record<string, { src: string; cols: number; rows: number; frames: number; fps: number }> = {
-  idle: { src: "idle_sheet.png", cols: 2, rows: 2, frames: 4, fps: 3 },
-  listening: { src: "listen_sheet.png", cols: 2, rows: 2, frames: 4, fps: 4 },
-  talking: { src: "talk_sheet.png", cols: 2, rows: 2, frames: 4, fps: 6 },
-  thinking: { src: "spritesheet.png", cols: 3, rows: 2, frames: 6, fps: 2 },
-  sleeping: { src: "idle_sheet.png", cols: 2, rows: 2, frames: 4, fps: 1.5 },
+const STATE_FOLDER: Record<string, string> = {
+  idle: "idle",
+  listening: "listen",
+  talking: "talk",
+  thinking: "thinking",
+  sleeping: "idle",
 };
 
-export const AnimatedMascot = ({ state, size = 64, className = "" }: AnimatedMascotProps) => {
-  const [frame, setFrame] = useState(0);
+const FPS: Record<string, number> = {
+  idle: 3,
+  listening: 4,
+  talking: 6,
+  thinking: 2,
+  sleeping: 1.5,
+};
+
+function getFolder(personaId: string, state: string): string {
+  const stateFolder = STATE_FOLDER[state] || "idle";
+  if (personaId === "default") return `frames/${stateFolder}`;
+  return `frames/${personaId}_${stateFolder}`;
+}
+
+export const AnimatedMascot = ({ state, personaId = "default", size = 64, className = "" }: AnimatedMascotProps) => {
+  const [frame, setFrame] = useState(1);
+  const [frameCount, setFrameCount] = useState(4);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
-  const sheet = SHEETS[state] || SHEETS.idle;
+  const folder = getFolder(personaId, state);
+  const fps = FPS[state] || 3;
 
   useEffect(() => {
-    setFrame(0);
+    let count = 1;
+    const probe = async () => {
+      for (let i = 1; i <= 20; i++) {
+        try {
+          const url = chrome.runtime.getURL(`assets/${folder}/${i}.png`);
+          const resp = await fetch(url, { method: "HEAD" });
+          if (resp.ok) count = i;
+          else break;
+        } catch {
+          break;
+        }
+      }
+      setFrameCount(count);
+      setFrame(1);
+    };
+    probe();
+  }, [folder]);
+
+  useEffect(() => {
+    if (frameCount < 1) return;
+    setFrame(1);
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
-      setFrame((f) => (f + 1) % sheet.frames);
-    }, 1000 / sheet.fps);
+      setFrame((f) => (f % frameCount) + 1);
+    }, 1000 / fps);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [state, sheet.frames, sheet.fps]);
+  }, [state, personaId, frameCount, fps]);
 
-  const col = frame % sheet.cols;
-  const row = Math.floor(frame / sheet.cols);
-  const bgX = -(col * 100);
-  const bgY = -(row * 100);
+  const src = chrome.runtime.getURL(`assets/${folder}/${frame}.png`);
 
   return (
-    <div
+    <img
+      src={src}
+      alt=""
       className={className}
+      width={size}
+      height={size}
       style={{
-        width: size,
-        height: size,
-        backgroundImage: `url(${chrome.runtime.getURL("assets/" + sheet.src)})`,
-        backgroundSize: `${sheet.cols * 100}% ${sheet.rows * 100}%`,
-        backgroundPosition: `${bgX}% ${bgY}%`,
-        imageRendering: "pixelated" as const,
+        imageRendering: "pixelated",
         filter: "drop-shadow(0 0 12px rgba(103,232,249,0.4)) drop-shadow(0 0 24px rgba(99,102,241,0.2))",
       }}
     />
