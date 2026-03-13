@@ -2,7 +2,7 @@ export const PII_PATTERNS: { name: string; regex: RegExp }[] = [
   { name: "credit_card", regex: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g },
   { name: "ssn", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
   { name: "api_key_google", regex: /AIza[0-9A-Za-z_-]{35}/g },
-  { name: "api_key_openai", regex: /sk-[a-zA-Z0-9]{20,}/g },
+  { name: "api_key_openai", regex: /sk-[a-zA-Z0-9_-]{20,}/g },
   { name: "api_key_elevenlabs", regex: /sk_[a-zA-Z0-9]{20,}/g },
   { name: "bearer_token", regex: /Bearer\s+[a-zA-Z0-9._-]{20,}/g },
   { name: "private_key", regex: /-----BEGIN[A-Z ]*PRIVATE KEY-----/g },

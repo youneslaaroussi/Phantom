@@ -22,7 +22,7 @@ export const BLUR_SENSITIVE_SCRIPT = () => {
     /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/,
     /\b\d{3}-\d{2}-\d{4}\b/,
     /AIza[0-9A-Za-z_-]{35}/,
-    /sk-[a-zA-Z0-9]{20,}/,
+    /sk-[a-zA-Z0-9_-]{20,}/,
     /sk_[a-zA-Z0-9]{20,}/,
     /-----BEGIN[A-Z ]*PRIVATE KEY-----/,
     /AKIA[0-9A-Z]{16}/,

@@ -52,7 +52,7 @@ export function findSensitiveInputs(doc: Document): SensitiveMatch[] {
     const action = form.getAttribute("action") || "";
     const isLogin = LOGIN_FORM_PATTERNS.some((p) => p.test(action));
     if (isLogin) {
-      for (const input of form.querySelectorAll('input[type="text"], input:not([type])')) {
+      for (const input of form.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input:not([type])')) {
         if (!seen.has(input)) {
           seen.add(input);
           matches.push({ element: input, reason: `login_form` });
