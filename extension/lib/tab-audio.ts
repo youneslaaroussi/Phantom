@@ -76,26 +76,34 @@ export async function stopTabAudio(): Promise<void> {
   console.log("[TabAudio] Stopped");
 }
 
-function startCaptureInPage(streamId: string) {
+async function startCaptureInPage(streamId: string) {
   if ((window as any).__phantom_tab_audio) return;
 
   var chunks: string[] = [];
 
-  navigator.mediaDevices.getUserMedia({
-    audio: {
-      mandatory: {
-        chromeMediaSource: "tab",
-        chromeMediaSourceId: streamId,
-      },
-    } as any,
-  } as any).then(function(stream) {
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        mandatory: {
+          chromeMediaSource: "tab",
+          chromeMediaSourceId: streamId,
+        },
+      } as any,
+    } as any);
+
     var audioCtx = new AudioContext({ sampleRate: 16000 });
     var source = audioCtx.createMediaStreamSource(stream);
-    source.connect(audioCtx.destination);
 
+    // ScriptProcessor taps into the stream to extract PCM chunks.
+    // We do NOT connect source → destination (that would echo audio back).
     var processor = audioCtx.createScriptProcessor(4096, 1, 1);
     source.connect(processor);
-    processor.connect(audioCtx.destination);
+    // Connect processor to destination so onaudioprocess fires (required by spec),
+    // but gain is zero so nothing is audible.
+    var silentGain = audioCtx.createGain();
+    silentGain.gain.value = 0;
+    processor.connect(silentGain);
+    silentGain.connect(audioCtx.destination);
 
     processor.onaudioprocess = function(e) {
       var state = (window as any).__phantom_tab_audio;
@@ -123,15 +131,16 @@ function startCaptureInPage(streamId: string) {
       stop: function() {
         this.active = false;
         processor.disconnect();
+        silentGain.disconnect();
         source.disconnect();
         stream.getTracks().forEach(function(t: MediaStreamTrack) { t.stop(); });
         audioCtx.close();
         delete (window as any).__phantom_tab_audio;
       },
     };
-  }).catch(function(err) {
+  } catch (err) {
     console.error("[TabAudio] Capture failed:", err);
-  });
+  }
 }
 
 function getChunkFromPage(): string | null {
