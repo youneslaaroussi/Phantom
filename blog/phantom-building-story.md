@@ -94,6 +94,8 @@ One painful discovery: when proxying WebSocket frames through Node.js, the `ws` 
     <filter id="s3"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
     <marker id="ah3" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#4285F4"/></marker>
     <marker id="ah3g" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#34A853"/></marker>
+    <marker id="ah3y" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#FBBC05"/></marker>
+    <marker id="ah3gr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#5F6368"/></marker>
   </defs>
   <rect width="800" height="220" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
   <!-- User -->
@@ -116,16 +118,16 @@ One painful discovery: when proxying WebSocket frames through Node.js, the `ws` 
   <path d="M150,90 Q245,30 338,60" fill="none" stroke="#4285F4" stroke-width="1.5" marker-end="url(#ah3)"/>
   <text x="230" y="46" fill="#4285F4" font-size="10" font-weight="500">16kHz PCM Audio</text>
   <!-- Gemini → User (voice response) -->
-  <path d="M338,75 Q245,130 152,110" fill="none" stroke="#34A853" stroke-width="1.5" marker-end="url(#ah3g)"/>
-  <text x="220" y="118" fill="#34A853" font-size="10" font-weight="500">24kHz Voice Response</text>
+  <path d="M338,80 Q245,155 152,120" fill="none" stroke="#34A853" stroke-width="1.5" marker-end="url(#ah3g)"/>
+  <text x="220" y="148" fill="#34A853" font-size="10" font-weight="500">24kHz Voice Response</text>
   <!-- Gemini → Tools (function call) -->
-  <line x1="410" y1="100" x2="410" y2="118" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah3)"/>
-  <text x="440" y="112" fill="#5F6368" font-size="9">fn call</text>
+  <line x1="410" y1="100" x2="410" y2="118" stroke="#34A853" stroke-width="1.5" marker-end="url(#ah3g)"/>
+  <text x="440" y="112" fill="#34A853" font-size="9">fn call</text>
   <!-- Tools → Page -->
-  <line x1="480" y1="155" x2="648" y2="110" stroke="#FBBC05" stroke-width="1.5" marker-end="url(#ah3)"/>
-  <text x="570" y="122" fill="#e37400" font-size="10" font-weight="500">Execute Action</text>
+  <line x1="480" y1="155" x2="648" y2="110" stroke="#FBBC05" stroke-width="1.5" marker-end="url(#ah3y)"/>
+  <text x="570" y="107" fill="#e37400" font-size="10" font-weight="500">Execute Action</text>
   <!-- Vision: Page → Gemini -->
-  <path d="M710,70 Q710,10 480,45" fill="none" stroke="#5F6368" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#ah3)"/>
+  <path d="M710,70 Q710,10 480,45" fill="none" stroke="#5F6368" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#ah3gr)"/>
   <text x="610" y="22" fill="#5F6368" font-size="9">Screen frames (1fps)</text>
 </svg>
 
