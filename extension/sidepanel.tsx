@@ -4,10 +4,11 @@ import { VoiceScreen } from "./components/voice-screen";
 import { SettingsScreen } from "./components/settings-screen";
 import { SetupScreen } from "./components/setup-screen";
 import { TraceViewer } from "./components/trace-viewer";
+import { DomInspector } from "./components/dom-inspector";
 import { ToastProvider } from "./components/toast";
 import "./style.css";
 
-type Screen = "voice" | "settings" | "setup" | "loading" | "traces";
+type Screen = "voice" | "settings" | "setup" | "loading" | "traces" | "dom";
 
 const SETUP_DONE_KEY = "phantom_setup_done";
 
@@ -41,7 +42,11 @@ const App = () => {
     return <TraceViewer onBack={() => setScreen("voice")} />;
   }
 
-  return <VoiceScreen onOpenSettings={() => setScreen("settings")} onOpenTraces={() => setScreen("traces")} />;
+  if (screen === "dom") {
+    return <DomInspector onBack={() => setScreen("voice")} />;
+  }
+
+  return <VoiceScreen onOpenSettings={() => setScreen("settings")} onOpenTraces={() => setScreen("traces")} onOpenDom={() => setScreen("dom")} />;
 };
 
 const SidePanel = () => {

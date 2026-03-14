@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Mic, Brain, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Mic, Brain, CheckCircle, Loader2, Volume2 } from "lucide-react";
 import { useSession } from "../lib/session";
 import { MicSelector } from "./mic-selector";
 import { PERSONAS, type Persona } from "../lib/personas";
@@ -34,6 +34,7 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
   const [embeddingReady, setEmbeddingReady] = useState(false);
   const [embeddingLoading, setEmbeddingLoading] = useState(false);
   const [embeddingProgress, setEmbeddingProgress] = useState(0);
+  const [soundAllowed, setSoundAllowed] = useState(true);
   const idx = PERSONAS.findIndex((p) => p.id === selected.id);
   const color = getColor(selected.id);
   const [dragOffset, setDragOffset] = useState(0);
@@ -49,6 +50,11 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
         if (status.state === "granted") setMicGranted(true);
         status.onchange = () => { if (status.state === "granted") setMicGranted(true); };
       } catch {}
+      try {
+        const audio = new Audio();
+        audio.volume = 0;
+        await audio.play().then(() => { audio.pause(); setSoundAllowed(true); }).catch(() => setSoundAllowed(false));
+      } catch { setSoundAllowed(false); }
       if (isModelReady()) {
         setEmbeddingReady(true);
         setEmbeddingProgress(100);
@@ -302,6 +308,32 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
                   </div>
                 )}
               </div>
+              <div style={{ borderTop: "1px solid var(--g-outline-variant)" }}>
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: soundAllowed ? "var(--g-green-bg)" : "var(--g-surface-container)" }}>
+                      <Volume2 className="w-3.5 h-3.5" style={{ color: soundAllowed ? "var(--g-green)" : "var(--g-outline)" }} />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-google font-medium">Sound</div>
+                      <div className="text-[11px] font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>
+                        {soundAllowed ? "Enabled" : "Blocked — enable in browser settings"}
+                      </div>
+                    </div>
+                  </div>
+                  {soundAllowed ? (
+                    <CheckCircle className="w-4.5 h-4.5" style={{ color: "var(--g-green)" }} />
+                  ) : (
+                    <button
+                      onClick={() => chrome.tabs.create({ url: `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}` })}
+                      className="px-3 py-1 rounded-g-full text-[11px] font-google font-medium text-white"
+                      style={{ background: "var(--g-blue)" }}
+                    >
+                      Fix
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -309,6 +341,7 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
             <div className="text-xs font-google font-medium uppercase tracking-wider" style={{ color: "var(--g-blue)" }}>Links</div>
             <div className="rounded-g-md overflow-hidden" style={{ background: "var(--g-surface-dim)", border: "1px solid var(--g-outline-variant)" }}>
               {[
+                { label: "Permissions", url: "" },
                 { label: "Devpost Challenge", url: "https://geminiliveagentchallenge.devpost.com/" },
                 { label: "GitHub", url: "https://github.com/youneslaaroussi/Phantom" },
                 { label: "Website", url: "https://phantom-server-pio3n3nsna-uc.a.run.app/" },
@@ -316,10 +349,16 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
                 { label: "Terms of Service", url: "https://phantom-server-pio3n3nsna-uc.a.run.app/terms" },
               ].map((link, i) => (
                 <a
-                  key={link.url}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  key={link.label}
+                  href={link.url || "#"}
+                  onClick={(e) => {
+                    if (!link.url) {
+                      e.preventDefault();
+                      chrome.tabs.create({ url: `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}` });
+                    }
+                  }}
+                  target={link.url ? "_blank" : undefined}
+                  rel={link.url ? "noopener noreferrer" : undefined}
                   className="flex items-center justify-between px-4 py-3 text-sm font-google-text transition-colors hover:bg-g-surface-container"
                   style={{
                     color: "var(--g-on-surface)",

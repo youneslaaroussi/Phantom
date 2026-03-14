@@ -295,6 +295,34 @@ async function executeToolInternal(
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: (q: string) => {
+          const esc = (s: string) => CSS.escape(s);
+          const only = (s: string) => { try { return document.querySelectorAll(s).length === 1; } catch { return false; } };
+          const UP = /^(w-|h-|p[xytrbl]?-|m[xytrbl]?-|text-\[|bg-\[|border-|rounded-|shadow-|opacity-|z-|gap-|space-|overflow-|max-|min-|top-|right-|bottom-|left-|inset-|translate-|scale-|rotate-|duration-|delay-|ease-|tracking-|leading-|font-(?:normal|bold|light|thin|medium|semibold|extrabold|black)|disabled:|hover:|focus:|active:|group-hover:|dark:|sm:|md:|lg:|xl:|2xl:)/;
+          const isSem = (c: string) => c.length <= 60 && !/^[0-9]/.test(c) && !UP.test(c);
+          const uniqueSel = (el: Element): string => {
+            if (el.id) { const s = `#${esc(el.id)}`; if (only(s)) return s; }
+            const tag = el.tagName.toLowerCase();
+            for (const a of ["aria-label", "placeholder", "name", "data-testid", "title", "type", "role"]) {
+              const v = el.getAttribute(a); if (v) { const s = `${tag}[${a}="${esc(v)}"]`; if (only(s)) return s; }
+            }
+            const all = (typeof el.className === "string" ? el.className : "").trim().split(/\s+/).filter(Boolean);
+            const sem = all.filter(isSem); const cls = sem.length > 0 ? sem : all.slice(0, 3);
+            for (const c of cls) { const s = `${tag}.${esc(c)}`; if (only(s)) return s; }
+            for (let i = 0; i < cls.length && i < 5; i++) for (let j = i + 1; j < cls.length && j < 6; j++) { const s = `${tag}.${esc(cls[i])}.${esc(cls[j])}`; if (only(s)) return s; }
+            const parts: string[] = [];
+            let cur: Element | null = el;
+            while (cur && cur !== document.body) {
+              let seg = cur.tagName.toLowerCase();
+              if (cur.id) { parts.unshift(`#${esc(cur.id)}`); const f = parts.join(" > "); if (only(f)) return f; return f; }
+              const p = cur.parentElement;
+              if (p) { const sibs = Array.from(p.children).filter(c => c.tagName === cur!.tagName); if (sibs.length > 1) seg = `${seg}:nth-of-type(${sibs.indexOf(cur) + 1})`; }
+              parts.unshift(seg);
+              const f = parts.join(" > "); if (only(f)) return f;
+              cur = cur.parentElement;
+            }
+            return parts.join(" > ");
+          };
+
           const sels = [
             "button", "a[href]", "input", "textarea", "select",
             '[role="button"]', '[role="link"]', '[role="textbox"]',
@@ -330,7 +358,7 @@ async function executeToolInternal(
 
             if (lq && !name.toLowerCase().includes(lq) && !role.toLowerCase().includes(lq)) return;
 
-            const sel = h.id ? `#${h.id}` : h.className ? `.${h.className.toString().split(" ")[0]}` : h.tagName.toLowerCase();
+            const sel = uniqueSel(h);
             const disabled = h.hasAttribute("disabled") ? " [DISABLED]" : "";
             elements.push(`[${idx}] ${role.toUpperCase()}: "${name}" → ${sel}${disabled}`);
             idx++;
@@ -348,6 +376,34 @@ async function executeToolInternal(
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => {
+          const esc = (s: string) => CSS.escape(s);
+          const only = (s: string) => { try { return document.querySelectorAll(s).length === 1; } catch { return false; } };
+          const UP = /^(w-|h-|p[xytrbl]?-|m[xytrbl]?-|text-\[|bg-\[|border-|rounded-|shadow-|opacity-|z-|gap-|space-|overflow-|max-|min-|top-|right-|bottom-|left-|inset-|translate-|scale-|rotate-|duration-|delay-|ease-|tracking-|leading-|font-(?:normal|bold|light|thin|medium|semibold|extrabold|black)|disabled:|hover:|focus:|active:|group-hover:|dark:|sm:|md:|lg:|xl:|2xl:)/;
+          const isSem = (c: string) => c.length <= 60 && !/^[0-9]/.test(c) && !UP.test(c);
+          const uniqueSel = (el: Element): string => {
+            if (el.id) { const s = `#${esc(el.id)}`; if (only(s)) return s; }
+            const tag = el.tagName.toLowerCase();
+            for (const a of ["aria-label", "placeholder", "name", "data-testid", "title", "type", "role"]) {
+              const v = el.getAttribute(a); if (v) { const s = `${tag}[${a}="${esc(v)}"]`; if (only(s)) return s; }
+            }
+            const all = (typeof el.className === "string" ? el.className : "").trim().split(/\s+/).filter(Boolean);
+            const sem = all.filter(isSem); const cls = sem.length > 0 ? sem : all.slice(0, 3);
+            for (const c of cls) { const s = `${tag}.${esc(c)}`; if (only(s)) return s; }
+            for (let i = 0; i < cls.length && i < 5; i++) for (let j = i + 1; j < cls.length && j < 6; j++) { const s = `${tag}.${esc(cls[i])}.${esc(cls[j])}`; if (only(s)) return s; }
+            const parts: string[] = [];
+            let cur: Element | null = el;
+            while (cur && cur !== document.body) {
+              let seg = cur.tagName.toLowerCase();
+              if (cur.id) { parts.unshift(`#${esc(cur.id)}`); const f = parts.join(" > "); if (only(f)) return f; return f; }
+              const p = cur.parentElement;
+              if (p) { const sibs = Array.from(p.children).filter(c => c.tagName === cur!.tagName); if (sibs.length > 1) seg = `${seg}:nth-of-type(${sibs.indexOf(cur) + 1})`; }
+              parts.unshift(seg);
+              const f = parts.join(" > "); if (only(f)) return f;
+              cur = cur.parentElement;
+            }
+            return parts.join(" > ");
+          };
+
           const elements: string[] = [];
           const walk = (el: Element, depth: number) => {
             const role = el.getAttribute("role") || el.tagName.toLowerCase();
@@ -357,7 +413,7 @@ async function executeToolInternal(
               || el.getAttribute("tabindex") !== null;
             if (isInteractive && name.trim()) {
               const indent = "  ".repeat(depth);
-              const sel = el.id ? `#${el.id}` : el.className ? `.${el.className.toString().split(" ")[0]}` : el.tagName.toLowerCase();
+              const sel = uniqueSel(el);
               elements.push(`${indent}[${role}] "${name.trim()}" → ${sel}`);
             }
             for (const child of el.children) walk(child, depth + 1);
@@ -377,6 +433,34 @@ async function executeToolInternal(
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: (q: string, t: string) => {
+          const esc = (s: string) => CSS.escape(s);
+          const only = (s: string) => { try { return document.querySelectorAll(s).length === 1; } catch { return false; } };
+          const UP = /^(w-|h-|p[xytrbl]?-|m[xytrbl]?-|text-\[|bg-\[|border-|rounded-|shadow-|opacity-|z-|gap-|space-|overflow-|max-|min-|top-|right-|bottom-|left-|inset-|translate-|scale-|rotate-|duration-|delay-|ease-|tracking-|leading-|font-(?:normal|bold|light|thin|medium|semibold|extrabold|black)|disabled:|hover:|focus:|active:|group-hover:|dark:|sm:|md:|lg:|xl:|2xl:)/;
+          const isSem = (c: string) => c.length <= 60 && !/^[0-9]/.test(c) && !UP.test(c);
+          const uniqueSel = (el: Element): string => {
+            if (el.id) { const s = `#${esc(el.id)}`; if (only(s)) return s; }
+            const tag = el.tagName.toLowerCase();
+            for (const a of ["aria-label", "placeholder", "name", "data-testid", "title", "type", "role"]) {
+              const v = el.getAttribute(a); if (v) { const s = `${tag}[${a}="${esc(v)}"]`; if (only(s)) return s; }
+            }
+            const all = (typeof el.className === "string" ? el.className : "").trim().split(/\s+/).filter(Boolean);
+            const sem = all.filter(isSem); const cls = sem.length > 0 ? sem : all.slice(0, 3);
+            for (const c of cls) { const s = `${tag}.${esc(c)}`; if (only(s)) return s; }
+            for (let i = 0; i < cls.length && i < 5; i++) for (let j = i + 1; j < cls.length && j < 6; j++) { const s = `${tag}.${esc(cls[i])}.${esc(cls[j])}`; if (only(s)) return s; }
+            const parts: string[] = [];
+            let cur: Element | null = el;
+            while (cur && cur !== document.body) {
+              let seg = cur.tagName.toLowerCase();
+              if (cur.id) { parts.unshift(`#${esc(cur.id)}`); const f = parts.join(" > "); if (only(f)) return f; return f; }
+              const p = cur.parentElement;
+              if (p) { const sibs = Array.from(p.children).filter(c => c.tagName === cur!.tagName); if (sibs.length > 1) seg = `${seg}:nth-of-type(${sibs.indexOf(cur) + 1})`; }
+              parts.unshift(seg);
+              const f = parts.join(" > "); if (only(f)) return f;
+              cur = cur.parentElement;
+            }
+            return parts.join(" > ");
+          };
+
           if (t === "selector") {
             const els = document.querySelectorAll(q);
             return Array.from(els).slice(0, 20).map((el, i) => {
@@ -391,7 +475,7 @@ async function executeToolInternal(
           all.forEach((el) => {
             const text = (el as HTMLElement).innerText?.toLowerCase() || "";
             if (text.includes(lowerQ) && el.children.length === 0) {
-              const sel = el.id ? `#${el.id}` : el.className ? `.${el.className.toString().split(" ")[0]}` : el.tagName.toLowerCase();
+              const sel = uniqueSel(el);
               matches.push(`<${el.tagName.toLowerCase()}> "${(el as HTMLElement).innerText.slice(0, 80)}" → ${sel}`);
             }
           });

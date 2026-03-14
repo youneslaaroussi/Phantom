@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Mic, ChevronRight, ChevronLeft, Brain, CheckCircle, Loader2, Shield } from "lucide-react";
+import { Mic, ChevronRight, ChevronLeft, Brain, CheckCircle, Loader2, Shield, Volume2 } from "lucide-react";
 import { useSession } from "../lib/session";
 import { MicSelector } from "./mic-selector";
 import { playWake, playConnect, playSuccess, playPersona } from "../lib/sounds";
@@ -225,6 +225,7 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
   const [embeddingLoading, setEmbeddingLoading] = useState(false);
   const [micGranted, setMicGranted] = useState(false);
   const [micDenied, setMicDenied] = useState(false);
+  const [soundAllowed, setSoundAllowed] = useState(true);
 
   useEffect(() => { playWake(); }, []);
 
@@ -236,6 +237,11 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
         if (status.state === "granted") setMicGranted(true);
         status.onchange = () => { if (status.state === "granted") setMicGranted(true); };
       } catch {}
+      try {
+        const audio = new Audio();
+        audio.volume = 0;
+        await audio.play().then(() => { audio.pause(); setSoundAllowed(true); }).catch(() => setSoundAllowed(false));
+      } catch { setSoundAllowed(false); }
     })();
   }, [step]);
 
@@ -429,6 +435,33 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
                   />
                 </div>
               )}
+            </div>
+
+            <div className="w-full rounded-g-md p-3.5" style={{ background: "var(--g-surface-dim)", border: "1px solid var(--g-outline-variant)" }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: soundAllowed ? "var(--g-green-bg)" : "var(--g-surface-container)" }}>
+                    <Volume2 className="w-4 h-4" style={{ color: soundAllowed ? "var(--g-green)" : "var(--g-outline)" }} />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-google font-medium">Sound</div>
+                    <div className="text-xs font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>
+                      {soundAllowed ? "Enabled" : "Enable sound to hear Phantom"}
+                    </div>
+                  </div>
+                </div>
+                {soundAllowed ? (
+                  <CheckCircle className="w-5 h-5" style={{ color: "var(--g-green)" }} />
+                ) : (
+                  <button
+                    onClick={() => chrome.tabs.create({ url: `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}` })}
+                    className="px-4 py-1.5 rounded-g-full text-xs font-google font-medium transition-all text-white"
+                    style={{ background: "var(--g-blue)" }}
+                  >
+                    Fix
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
