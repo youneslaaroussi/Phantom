@@ -41,7 +41,7 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
   let session: Session | null = null;
   let setupReceived = false;
   const buffer: string[] = [];
-  let toolCallPending = false;
+  let inputGated = false;
 
   async function initSession(setupMsg: Record<string, unknown>) {
     const ai = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: "v1alpha" } });
@@ -117,8 +117,13 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
           },
           onmessage(message: any) {
             if (message.toolCall?.functionCalls?.length) {
-              toolCallPending = true;
-              console.log("[proxy] Tool call received — gating realtimeInput");
+              inputGated = true;
+            }
+            if (message.serverContent?.modelTurn) {
+              inputGated = true;
+            }
+            if (message.serverContent?.turnComplete) {
+              inputGated = false;
             }
             clientWs.send(JSON.stringify(message));
           },
@@ -180,7 +185,7 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
 
     try {
       if (msg.realtimeInput) {
-        if (toolCallPending) return;
+        if (inputGated) return;
         const ri = msg.realtimeInput as Record<string, unknown>;
         if (ri.audio) {
           session.sendRealtimeInput({ audio: ri.audio as any });
@@ -195,14 +200,13 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
       }
 
       if (msg.clientContent) {
-        if (toolCallPending) return;
+        if (inputGated) return;
         session.sendClientContent(msg.clientContent as any);
         return;
       }
 
       if (msg.toolResponse) {
-        toolCallPending = false;
-        console.log("[proxy] Tool response sent — ungating realtimeInput");
+        inputGated = false;
         session.sendToolResponse(msg.toolResponse as any);
         return;
       }
