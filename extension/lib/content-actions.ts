@@ -38,29 +38,25 @@ export async function executeContentAction(
     target: { tabId: tab.id },
     func: (sel: string) => {
       let el = document.querySelector(sel) as HTMLElement | null;
+      var usedSelector = sel;
       if (!el) {
         var candidates = ["article", "main", "[role='main']"];
         for (var i = 0; i < candidates.length; i++) {
           var c = document.querySelector(candidates[i]) as HTMLElement | null;
-          if (c && (c.innerText || "").trim().length > 50) { el = c; break; }
+          if (c && (c.innerText || "").trim().length > 50) { el = c; usedSelector = candidates[i]; break; }
         }
       }
       if (!el) return null;
-      var clone = el.cloneNode(true) as HTMLElement;
-      clone.querySelectorAll("script, style, nav, header, footer, iframe").forEach(function(n) { n.remove(); });
-      document.body.appendChild(clone);
-      clone.style.position = "absolute";
-      clone.style.left = "-9999px";
-      clone.style.visibility = "hidden";
-      var text = (clone.innerText || clone.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
-      clone.remove();
-      return text.slice(0, 6000);
+      var text = (el.innerText || el.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+      return { text: text.slice(0, 6000), selector: usedSelector };
     },
     args: [selector],
   });
 
-  const text = textResults[0]?.result;
-  if (!text) return { success: false, error: `Element not found: ${selector}` };
+  const extracted = textResults[0]?.result;
+  if (!extracted) return { success: false, error: `Element not found: ${selector}` };
+  const text = typeof extracted === "string" ? extracted : extracted.text;
+  const resolvedSelector = typeof extracted === "string" ? selector : extracted.selector;
 
   addTrace("content_action", `${action}: ${text.slice(0, 80)}...`);
 
@@ -77,7 +73,7 @@ export async function executeContentAction(
   await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: showContentPopup,
-    args: [selector, action, aiResult],
+    args: [resolvedSelector, action, aiResult],
   });
 
   return { success: true, result: aiResult };
