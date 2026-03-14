@@ -71,7 +71,7 @@ Phantom is a Chrome extension that turns your browser into a voice-controlled wo
 ### System Overview
 
 <div align="center">
-<img src="./diagrams/system_architecture.png" alt="System Architecture" width="800" />
+<img src="../docs/system-architecture.svg" alt="System Architecture" width="800" />
 </div>
 
 The system has four layers:
