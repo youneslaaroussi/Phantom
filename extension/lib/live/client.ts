@@ -34,6 +34,7 @@ export class LiveSession {
   };
   private resumptionHandle: string | null = null;
   private toolAbortController: AbortController | null = null;
+  private inputGated = false;
 
   constructor(config: LiveSessionConfig, callbacks: LiveSessionCallbacks = {}) {
     this.config = config;
@@ -192,11 +193,13 @@ export class LiveSession {
 
         if (content.interrupted) {
           this.audioPlayer?.clear();
+          this.inputGated = false;
           this.setState({ isSpeaking: false });
           return;
         }
 
         if (content.modelTurn?.parts) {
+          this.inputGated = true;
           for (const part of content.modelTurn.parts) {
             if (part.inlineData?.data) {
               const audioData = base64ToArrayBuffer(part.inlineData.data);
@@ -211,7 +214,6 @@ export class LiveSession {
           }
         }
 
-        // Audio transcriptions
         if (content.inputTranscription?.text) {
           this.callbacks.onInputTranscription?.(content.inputTranscription.text);
         }
@@ -220,11 +222,13 @@ export class LiveSession {
         }
 
         if (content.turnComplete) {
+          this.inputGated = false;
           this.setState({ isSpeaking: false });
         }
       }
 
       if (message.toolCall?.functionCalls) {
+        this.inputGated = true;
         this.handleToolCalls(message.toolCall.functionCalls);
       }
 
@@ -300,6 +304,7 @@ export class LiveSession {
 
   private sendToolResponses(responses: ToolCallResponse[]) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.inputGated = false;
 
     const message = {
       toolResponse: {
@@ -343,7 +348,7 @@ export class LiveSession {
     this.audioCapture?.stop();
     this.audioCapture = null;
 
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && !this.inputGated) {
       this.ws.send(
         JSON.stringify({
           realtimeInput: {
@@ -358,6 +363,7 @@ export class LiveSession {
 
   private sendAudio(audioData: ArrayBuffer) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (this.inputGated) return;
 
     const message = {
       realtimeInput: {
@@ -372,9 +378,8 @@ export class LiveSession {
   }
 
   pushTabAudio(pcm: Int16Array): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      return false;
-    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    if (this.inputGated) return true;
     if (this.audioCapture) {
       this.audioCapture.pushTabAudio(pcm);
     } else {
@@ -384,9 +389,8 @@ export class LiveSession {
   }
 
   sendText(text: string): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error("Not connected");
-    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (this.inputGated) return;
 
     const message = {
       clientContent: {
@@ -404,10 +408,8 @@ export class LiveSession {
   }
 
   sendImage(base64Data: string, mimeType: string): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn("[LiveSession] sendImage: ws not open");
-      return;
-    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (this.inputGated) return;
 
     const message = {
       realtimeInput: {

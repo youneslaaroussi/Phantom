@@ -125,10 +125,7 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
             }
             if (message.serverContent?.turnComplete) {
               inputGated = false;
-              if (lastVideoFrame && session) {
-                try { session.sendRealtimeInput({ video: lastVideoFrame }); } catch {}
-                lastVideoFrame = null;
-              }
+              lastVideoFrame = null;
             }
             clientWs.send(JSON.stringify(message));
           },
