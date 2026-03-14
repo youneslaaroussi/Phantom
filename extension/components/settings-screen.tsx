@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Mic, Brain, CheckCircle, Loader2 } from "lucide-react";
 import { useSession } from "../lib/session";
 import { MicSelector } from "./mic-selector";
 import { PERSONAS, type Persona } from "../lib/personas";
-import { playPersona } from "../lib/sounds";
+import { playPersona, playSuccess } from "../lib/sounds";
+import { loadEmbeddingModel, isModelReady, type ProgressCallback } from "../lib/memory";
 
 const PERSONA_COLORS: Record<string, { accent: string; bg: string }> = {
   default:   { accent: "#4285F4", bg: "#e8f0fe" },
@@ -28,6 +29,11 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
   const { persona, setPersonaId, disconnect } = useSession();
   const [version, setVersion] = useState("");
   const [selected, setSelected] = useState<Persona>(persona);
+  const [micGranted, setMicGranted] = useState(false);
+  const [micDenied, setMicDenied] = useState(false);
+  const [embeddingReady, setEmbeddingReady] = useState(false);
+  const [embeddingLoading, setEmbeddingLoading] = useState(false);
+  const [embeddingProgress, setEmbeddingProgress] = useState(0);
   const idx = PERSONAS.findIndex((p) => p.id === selected.id);
   const color = getColor(selected.id);
   const [dragOffset, setDragOffset] = useState(0);
@@ -37,7 +43,58 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
 
   useEffect(() => {
     setVersion(chrome.runtime.getManifest().version);
+    (async () => {
+      try {
+        const status = await navigator.permissions.query({ name: "microphone" as PermissionName });
+        if (status.state === "granted") setMicGranted(true);
+        status.onchange = () => { if (status.state === "granted") setMicGranted(true); };
+      } catch {}
+      if (isModelReady()) {
+        setEmbeddingReady(true);
+        setEmbeddingProgress(100);
+      } else {
+        setEmbeddingLoading(true);
+        try {
+          await loadEmbeddingModel((p: { status: string; progress?: number }) => {
+            if (p.status === "progress" && p.progress) setEmbeddingProgress(Math.round(p.progress));
+          });
+          setEmbeddingReady(true);
+          setEmbeddingProgress(100);
+        } catch {
+          setEmbeddingLoading(false);
+        }
+      }
+    })();
   }, []);
+
+  const handleRequestMic = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      setMicGranted(true);
+      setMicDenied(false);
+    } catch {
+      setMicDenied(true);
+      setMicGranted(false);
+    }
+  };
+
+  const handleDownloadModel = async () => {
+    if (embeddingReady || embeddingLoading) return;
+    setEmbeddingLoading(true);
+    try {
+      await loadEmbeddingModel((p: { status: string; progress?: number }) => {
+        if (p.status === "progress" && p.progress) setEmbeddingProgress(Math.round(p.progress));
+      });
+      setEmbeddingReady(true);
+      setEmbeddingProgress(100);
+      playSuccess();
+    } catch (err) {
+      console.error("Embedding model download failed:", err);
+    } finally {
+      setEmbeddingLoading(false);
+    }
+  };
 
   const goTo = useCallback((i: number) => {
     const clamped = Math.max(0, Math.min(PERSONAS.length - 1, i));
@@ -181,6 +238,71 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
           <div className="space-y-3">
             <div className="text-xs font-google font-medium uppercase tracking-wider" style={{ color: "var(--g-blue)" }}>Microphone</div>
             <MicSelector />
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-xs font-google font-medium uppercase tracking-wider" style={{ color: "var(--g-blue)" }}>Permissions</div>
+            <div className="rounded-g-md overflow-hidden" style={{ background: "var(--g-surface-dim)", border: "1px solid var(--g-outline-variant)" }}>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: micGranted ? "var(--g-green-bg)" : micDenied ? "var(--g-red-bg)" : "var(--g-surface-container)" }}>
+                    <Mic className="w-3.5 h-3.5" style={{ color: micGranted ? "var(--g-green)" : micDenied ? "var(--g-red)" : "var(--g-outline)" }} />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-google font-medium">Microphone</div>
+                    <div className="text-[11px] font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>
+                      {micGranted ? "Access granted" : micDenied ? "Access denied" : "For voice conversations"}
+                    </div>
+                  </div>
+                </div>
+                {micGranted ? (
+                  <CheckCircle className="w-4.5 h-4.5" style={{ color: "var(--g-green)" }} />
+                ) : (
+                  <button
+                    onClick={handleRequestMic}
+                    className="px-3 py-1 rounded-g-full text-[11px] font-google font-medium text-white"
+                    style={{ background: "var(--g-blue)" }}
+                  >
+                    Allow
+                  </button>
+                )}
+              </div>
+              <div style={{ borderTop: "1px solid var(--g-outline-variant)" }}>
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: embeddingReady ? "var(--g-green-bg)" : "var(--g-surface-container)" }}>
+                      <Brain className="w-3.5 h-3.5" style={{ color: embeddingReady ? "var(--g-green)" : "var(--g-outline)" }} />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-google font-medium">Memory Model</div>
+                      <div className="text-[11px] font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>
+                        {embeddingReady ? "Ready" : embeddingLoading ? "Downloading..." : "~30MB local model"}
+                      </div>
+                    </div>
+                  </div>
+                  {embeddingReady ? (
+                    <CheckCircle className="w-4.5 h-4.5" style={{ color: "var(--g-green)" }} />
+                  ) : embeddingLoading ? (
+                    <Loader2 className="w-4.5 h-4.5 animate-spin" style={{ color: "var(--g-blue)" }} />
+                  ) : (
+                    <button
+                      onClick={handleDownloadModel}
+                      className="px-3 py-1 rounded-g-full text-[11px] font-google font-medium text-white"
+                      style={{ background: "var(--g-blue)" }}
+                    >
+                      Download
+                    </button>
+                  )}
+                </div>
+                {embeddingLoading && !embeddingReady && (
+                  <div className="px-4 pb-3">
+                    <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ background: "var(--g-surface-container-high)" }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${embeddingProgress}%`, background: "var(--g-blue)" }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">

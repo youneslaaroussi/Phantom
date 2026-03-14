@@ -11,7 +11,7 @@ import type { LiveToolDeclaration } from "./live/types";
 import { playNavigate, playScroll, playHighlight, playTyping, playSuccess } from "./sounds";
 import { executeComputerAction } from "./computer-use";
 import { executeContentAction, type ContentActionType } from "./content-actions";
-import { showAgentCursorAtSelector } from "./agent-cursor";
+
 import {
   addMemory,
   searchMemories,
@@ -409,7 +409,7 @@ async function executeToolInternal(
       // Show agent cursor at target
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: showAgentCursorAtSelector,
+        func: _injectClickCursor,
         args: [selector],
       });
       // Wait for cursor animation then click
@@ -491,8 +491,8 @@ async function executeToolInternal(
       if (!tab?.id) return { success: false, error: "No active tab" };
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (px: number) => window.scrollBy(0, px),
-        args: [pixels],
+        func: _injectScrollCursor,
+        args: [window.innerWidth / 2, window.innerHeight / 2, "down", pixels],
       });
       return { success: true, result: `Scrolled down ${pixels}px` };
     }
@@ -504,8 +504,8 @@ async function executeToolInternal(
       if (!tab?.id) return { success: false, error: "No active tab" };
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (px: number) => window.scrollBy(0, -px),
-        args: [pixels],
+        func: _injectScrollCursor,
+        args: [window.innerWidth / 2, window.innerHeight / 2, "up", pixels],
       });
       return { success: true, result: `Scrolled up ${pixels}px` };
     }
@@ -650,4 +650,92 @@ async function executeToolInternal(
     default:
       return { success: false, error: `Unknown tool: ${name}` };
   }
+}
+
+function _injectClickCursor(selector: string) {
+  const el = document.querySelector(selector) as HTMLElement | null;
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+
+  const existing = document.getElementById("phantom-agent-cursor");
+  if (existing) existing.remove();
+
+  const cursor = document.createElement("div");
+  cursor.id = "phantom-agent-cursor";
+  cursor.innerHTML = `<div style="width:48px;height:48px;border-radius:24px;background:rgba(66,133,244,0.15);border:2.5px solid #4285F4;box-shadow:0 0 16px rgba(66,133,244,0.25),0 0 4px rgba(66,133,244,0.15);transform:translate(-50%,-50%);"></div><div id="phantom-cursor-ripple" style="position:absolute;top:0;left:0;width:48px;height:48px;border-radius:50%;background:rgba(66,133,244,0.2);transform:translate(-50%,-50%) scale(1);pointer-events:none;opacity:1;"></div>`;
+
+  const edges = [
+    { left: x, top: -60 },
+    { left: x, top: window.innerHeight + 60 },
+    { left: -60, top: y },
+    { left: window.innerWidth + 60, top: y },
+  ];
+  const start = edges[Math.floor(Math.random() * edges.length)];
+  cursor.style.cssText = `position:fixed;z-index:2147483646;pointer-events:none;transition:left 0.4s cubic-bezier(0.4,0,0.2,1),top 0.4s cubic-bezier(0.4,0,0.2,1);left:${start.left}px;top:${start.top}px;`;
+
+  document.body.appendChild(cursor);
+  requestAnimationFrame(() => { cursor.style.left = x + "px"; cursor.style.top = y + "px"; });
+
+  setTimeout(() => {
+    const ripple = document.getElementById("phantom-cursor-ripple");
+    if (ripple) { ripple.style.transition = "transform 0.5s cubic-bezier(0.4,0,0.2,1),opacity 0.5s ease-out"; ripple.style.transform = "translate(-50%,-50%) scale(2.5)"; ripple.style.opacity = "0"; }
+  }, 420);
+  setTimeout(() => { cursor.style.transition = "opacity 0.5s ease-out"; cursor.style.opacity = "0"; }, 2000);
+  setTimeout(() => { cursor.remove(); }, 2500);
+}
+
+function _injectScrollCursor(x: number, y: number, direction: string, amount: number) {
+  const existing = document.getElementById("phantom-agent-cursor");
+  if (existing) existing.remove();
+
+  const isDown = direction === "down";
+  const scrollDuration = 800;
+  const drift = isDown ? 150 : -150;
+
+  const cursor = document.createElement("div");
+  cursor.id = "phantom-agent-cursor";
+  cursor.innerHTML = `<div style="width:48px;height:48px;border-radius:24px;background:rgba(66,133,244,0.15);border:2.5px solid #4285F4;box-shadow:0 0 16px rgba(66,133,244,0.25),0 0 4px rgba(66,133,244,0.15);transform:translate(-50%,-50%);"></div>`;
+
+  const edges = [
+    { left: x, top: -60 },
+    { left: x, top: window.innerHeight + 60 },
+    { left: -60, top: y },
+    { left: window.innerWidth + 60, top: y },
+  ];
+  const start = edges[Math.floor(Math.random() * edges.length)];
+  cursor.style.cssText = `position:fixed;z-index:2147483646;pointer-events:none;transition:left 0.4s cubic-bezier(0.4,0,0.2,1),top 0.4s cubic-bezier(0.4,0,0.2,1);left:${start.left}px;top:${start.top}px;`;
+
+  document.body.appendChild(cursor);
+
+  requestAnimationFrame(() => {
+    cursor.style.left = x + "px";
+    cursor.style.top = y + "px";
+  });
+
+  setTimeout(() => {
+    cursor.style.transition = `top ${scrollDuration}ms cubic-bezier(0.4,0,0.2,1)`;
+    cursor.style.top = (y + drift) + "px";
+
+    const startScroll = window.scrollY;
+    const targetScroll = startScroll + (isDown ? amount : -amount);
+    const startTime = performance.now();
+    function animateScroll(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / scrollDuration, 1);
+      const ease = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      window.scrollTo(0, startScroll + (targetScroll - startScroll) * ease);
+      if (progress < 1) requestAnimationFrame(animateScroll);
+    }
+    requestAnimationFrame(animateScroll);
+  }, 450);
+
+  setTimeout(() => {
+    cursor.style.transition = "top 0.4s cubic-bezier(0.4,0,0.2,1),opacity 0.4s ease-out";
+    cursor.style.top = (isDown ? window.innerHeight + 60 : -60) + "px";
+    cursor.style.opacity = "0";
+  }, 450 + scrollDuration + 200);
+
+  setTimeout(() => { cursor.remove(); }, 450 + scrollDuration + 700);
 }

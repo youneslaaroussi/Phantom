@@ -1,14 +1,18 @@
+import { addTrace } from "./trace";
+
 let capturing = false;
 let chunkInterval: ReturnType<typeof setInterval> | null = null;
 let activeTabId: number | null = null;
-let sendChunkFn: ((base64: string) => void) | null = null;
+let sendChunkFn: ((pcm: Int16Array) => boolean) | null = null;
+let chunkCount = 0;
+let totalBytes = 0;
 
 export function isTabAudioActive(): boolean {
   return capturing;
 }
 
 export async function startTabAudio(
-  sendChunk: (base64: string) => void
+  sendChunk: (pcm: Int16Array) => boolean
 ): Promise<void> {
   if (capturing) return;
 
@@ -18,23 +22,56 @@ export async function startTabAudio(
     throw new Error("Cannot capture audio from this page");
   }
 
-  const resp = await chrome.runtime.sendMessage({
-    type: "get-tab-audio-stream-id",
-    tabId: tab.id,
-  });
+  const stored = await chrome.storage.local.get(["pendingStreamId", "pendingStreamTabId", "pendingStreamTs"]);
 
-  if (resp.error) throw new Error(resp.error);
-  const streamId = resp.streamId;
+  let streamId: string | undefined;
+  const MAX_STREAM_AGE = 15000;
 
-  await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: startCaptureInPage,
-    args: [streamId],
-  });
+  if (stored.pendingStreamId && stored.pendingStreamTabId === tab.id) {
+    const age = Date.now() - (stored.pendingStreamTs || 0);
+    if (age < MAX_STREAM_AGE) {
+      streamId = stored.pendingStreamId;
+      addTrace("system", `Tab audio: using cached stream ID (age: ${age}ms)`);
+      await chrome.storage.local.remove(["pendingStreamId", "pendingStreamTabId", "pendingStreamTs"]);
+    }
+  }
+
+  if (!streamId) {
+    addTrace("system", "Tab audio: requesting fresh stream ID from background");
+    const resp = await chrome.runtime.sendMessage({ type: "get-tab-audio-stream-id", tabId: tab.id });
+    if (resp?.error) {
+      throw new Error(`Tab audio stream failed: ${resp.error}`);
+    }
+    streamId = resp?.streamId;
+  }
+
+  if (!streamId) {
+    throw new Error("Failed to get tab audio stream ID");
+  }
+
+  addTrace("system", `Tab audio: got stream ID`);
+
+  let started = await tryStartCapture(tab.id, streamId);
+
+  if (!started) {
+    addTrace("system", "Tab audio: first attempt failed, requesting fresh stream ID");
+    const resp = await chrome.runtime.sendMessage({ type: "get-tab-audio-stream-id", tabId: tab.id });
+    if (resp?.error || !resp?.streamId) {
+      throw new Error("Tab audio: failed to get fresh stream ID for retry");
+    }
+    started = await tryStartCapture(tab.id, resp.streamId);
+  }
+
+  if (!started) {
+    throw new Error("Tab audio capture failed after retry");
+  }
 
   activeTabId = tab.id;
   sendChunkFn = sendChunk;
   capturing = true;
+
+  chunkCount = 0;
+  totalBytes = 0;
 
   chunkInterval = setInterval(async () => {
     if (!capturing || !activeTabId) return;
@@ -43,14 +80,26 @@ export async function startTabAudio(
         target: { tabId: activeTabId },
         func: getChunkFromPage,
       });
-      const b64 = results?.[0]?.result;
-      if (b64 && sendChunkFn) {
-        sendChunkFn(b64);
+      const samples = results?.[0]?.result as number[] | null;
+      if (samples && samples.length > 0 && sendChunkFn) {
+        const pcm = new Int16Array(samples);
+        const sent = sendChunkFn(pcm);
+        if (!sent) {
+          addTrace("system", "Tab audio: ws closed, auto-stopping");
+          stopTabAudio();
+          return;
+        }
+        chunkCount++;
+        const byteLen = pcm.byteLength;
+        totalBytes += byteLen;
+        addTrace("system", `Tab audio chunk #${chunkCount}: ${(byteLen / 1024).toFixed(1)}KB (total: ${(totalBytes / 1024).toFixed(1)}KB)`);
       }
-    } catch {}
+    } catch (err) {
+      addTrace("error", `Tab audio chunk failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }, 500);
 
-  console.log("[TabAudio] Started streaming");
+  addTrace("system", `Tab audio started streaming (tab ${activeTabId})`);
 }
 
 export async function stopTabAudio(): Promise<void> {
@@ -73,13 +122,24 @@ export async function stopTabAudio(): Promise<void> {
     activeTabId = null;
   }
 
-  console.log("[TabAudio] Stopped");
+  addTrace("system", `Tab audio stopped (${chunkCount} chunks, ${(totalBytes / 1024).toFixed(1)}KB total)`);
 }
 
-async function startCaptureInPage(streamId: string) {
-  if ((window as any).__phantom_tab_audio) return;
+async function tryStartCapture(tabId: number, streamId: string): Promise<boolean> {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: startCaptureInPage,
+    args: [streamId],
+  });
+  return results?.[0]?.result === true;
+}
 
-  var chunks: string[] = [];
+async function startCaptureInPage(streamId: string): Promise<boolean> {
+  if ((window as any).__phantom_tab_audio) {
+    try { (window as any).__phantom_tab_audio.stop(); } catch (_e) {}
+  }
+
+  var pcmChunks: Int16Array[] = [];
 
   try {
     var stream = await navigator.mediaDevices.getUserMedia({
@@ -94,12 +154,8 @@ async function startCaptureInPage(streamId: string) {
     var audioCtx = new AudioContext({ sampleRate: 16000 });
     var source = audioCtx.createMediaStreamSource(stream);
 
-    // ScriptProcessor taps into the stream to extract PCM chunks.
-    // We do NOT connect source → destination (that would echo audio back).
     var processor = audioCtx.createScriptProcessor(4096, 1, 1);
     source.connect(processor);
-    // Connect processor to destination so onaudioprocess fires (required by spec),
-    // but gain is zero so nothing is audible.
     var silentGain = audioCtx.createGain();
     silentGain.gain.value = 0;
     processor.connect(silentGain);
@@ -114,19 +170,14 @@ async function startCaptureInPage(streamId: string) {
         var s = Math.max(-1, Math.min(1, input[i]));
         pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
-      var bytes = new Uint8Array(pcm16.buffer);
-      var binary = "";
-      for (var j = 0; j < bytes.length; j++) {
-        binary += String.fromCharCode(bytes[j]);
-      }
-      chunks.push(btoa(binary));
+      pcmChunks.push(new Int16Array(pcm16));
     };
 
     (window as any).__phantom_tab_audio = {
       stream: stream,
       audioCtx: audioCtx,
       processor: processor,
-      chunks: chunks,
+      pcmChunks: pcmChunks,
       active: true,
       stop: function() {
         this.active = false;
@@ -138,17 +189,32 @@ async function startCaptureInPage(streamId: string) {
         delete (window as any).__phantom_tab_audio;
       },
     };
+    return true;
   } catch (err) {
     console.error("[TabAudio] Capture failed:", err);
+    return false;
   }
 }
 
-function getChunkFromPage(): string | null {
+function getChunkFromPage(): number[] | null {
   var state = (window as any).__phantom_tab_audio;
-  if (!state || !state.chunks || state.chunks.length === 0) return null;
-  var all = state.chunks.join("");
-  state.chunks.length = 0;
-  return all;
+  if (!state || !state.pcmChunks || state.pcmChunks.length === 0) return null;
+
+  var parts = (state.pcmChunks as Int16Array[]).slice();
+  state.pcmChunks.length = 0;
+  var numParts = parts.length;
+
+  var totalLen = 0;
+  for (var i = 0; i < numParts; i++) totalLen += parts[i].length;
+
+  var merged = new Int16Array(totalLen);
+  var offset = 0;
+  for (var k = 0; k < numParts; k++) {
+    merged.set(parts[k], offset);
+    offset += parts[k].length;
+  }
+
+  return Array.from(merged);
 }
 
 function stopCaptureInPage() {

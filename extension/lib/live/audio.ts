@@ -38,6 +38,36 @@ export class AudioCapture {
   private onAudioData: ((data: ArrayBuffer) => void) | null = null;
   private onAudioLevel: ((level: number) => void) | null = null;
   private levelCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private tabBuffer: Int16Array[] = [];
+  private tabBufferSamples = 0;
+
+  pushTabAudio(pcm: Int16Array): void {
+    this.tabBuffer.push(pcm);
+    this.tabBufferSamples += pcm.length;
+  }
+
+  private drainTabBuffer(numSamples: number): Int16Array {
+    const out = new Int16Array(numSamples);
+    let written = 0;
+
+    while (written < numSamples && this.tabBuffer.length > 0) {
+      const chunk = this.tabBuffer[0];
+      const needed = numSamples - written;
+
+      if (chunk.length <= needed) {
+        out.set(chunk, written);
+        written += chunk.length;
+        this.tabBuffer.shift();
+      } else {
+        out.set(chunk.subarray(0, needed), written);
+        this.tabBuffer[0] = chunk.subarray(needed);
+        written = numSamples;
+      }
+    }
+
+    this.tabBufferSamples = this.tabBuffer.reduce((s, c) => s + c.length, 0);
+    return out;
+  }
 
   async start(
     onAudioData: (data: ArrayBuffer) => void,
@@ -72,7 +102,7 @@ export class AudioCapture {
     this.analyserNode.fftSize = 256;
     this.analyserNode.smoothingTimeConstant = 0.5;
 
-    this.scriptNode = this.audioContext.createScriptProcessor(4096, 1, 1);
+    this.scriptNode = this.audioContext.createScriptProcessor(CHUNK_SIZE, 1, 1);
     this.scriptNode.onaudioprocess = (e) => {
       if (!this.onAudioData) return;
       const input = e.inputBuffer.getChannelData(0);
@@ -81,6 +111,15 @@ export class AudioCapture {
         const s = Math.max(-1, Math.min(1, input[i]));
         pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
+
+      if (this.tabBufferSamples > 0) {
+        const tab = this.drainTabBuffer(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          const mixed = pcm16[i] + tab[i];
+          pcm16[i] = mixed > 32767 ? 32767 : mixed < -32768 ? -32768 : mixed;
+        }
+      }
+
       this.onAudioData(pcm16.buffer);
     };
 
@@ -141,6 +180,8 @@ export class AudioCapture {
 
     this.onAudioData = null;
     this.onAudioLevel = null;
+    this.tabBuffer = [];
+    this.tabBufferSamples = 0;
   }
 
 }

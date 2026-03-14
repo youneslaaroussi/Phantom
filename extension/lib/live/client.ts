@@ -13,6 +13,7 @@ import type {
   ToolCallResponse,
 } from "./types";
 import { AudioCapture, AudioPlayer, arrayBufferToBase64, base64ToArrayBuffer } from "./audio";
+import { addTrace } from "../trace";
 
 const LIVE_API_BASE = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 
@@ -80,6 +81,7 @@ export class LiveSession {
 
       this.ws.onclose = (event) => {
         console.log("[LiveSession] WebSocket closed:", event.code, event.reason);
+        addTrace("system", `WebSocket closed: code=${event.code} reason="${event.reason || "none"}"`);
         const is1008 = event.code === 1008;
         const friendlyMessage = is1008
           ? "Connection closed. Reconnect to continue."
@@ -343,19 +345,16 @@ export class LiveSession {
     this.ws.send(JSON.stringify(message));
   }
 
-  sendAudioBase64(base64Data: string): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-
-    const message = {
-      realtimeInput: {
-        audio: {
-          data: base64Data,
-          mimeType: "audio/pcm;rate=16000",
-        },
-      },
-    };
-
-    this.ws.send(JSON.stringify(message));
+  pushTabAudio(pcm: Int16Array): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+    if (this.audioCapture) {
+      this.audioCapture.pushTabAudio(pcm);
+    } else {
+      this.sendAudio(pcm.buffer as ArrayBuffer);
+    }
+    return true;
   }
 
   sendText(text: string): void {

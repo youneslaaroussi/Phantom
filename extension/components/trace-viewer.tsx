@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Copy, Trash2, ChevronDown, ChevronRight, Terminal, User, Bot, Wrench, Eye, AlertCircle, Info } from "lucide-react";
+import { ArrowLeft, Copy, Trash2, ChevronDown, ChevronRight, Terminal, User, Bot, Wrench, Eye, AlertCircle, Info, RotateCw } from "lucide-react";
 import { getCurrentSession, getSavedSessions, clearSavedSessions, clearCurrentSession, onTraceUpdate, formatTraceAsText, type SessionTrace, type TraceEntry, type TraceEntryType } from "../lib/trace";
+import { executeTool } from "../lib/tools";
 import { MarkdownText } from "./markdown";
+import { Tooltip } from "./tooltip";
 
 interface TraceViewerProps {
   onBack: () => void;
@@ -72,12 +74,16 @@ export const TraceViewer = ({ onBack }: TraceViewerProps) => {
           <ArrowLeft className="w-5 h-5" style={{ color: "var(--g-on-surface)" }} />
         </button>
         <span className="font-google text-base font-medium flex-1">Traces</span>
-        <button onClick={handleCopy} className="p-2 rounded-full hover:bg-g-surface-container transition-colors" title="Copy session" style={{ color: "var(--g-outline)" }}>
-          <Copy className="w-4 h-4" />
-        </button>
-        <button onClick={handleClear} className="p-2 rounded-full hover:bg-g-surface-container transition-colors" title="Clear saved" style={{ color: "var(--g-outline)" }}>
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <Tooltip text="Copy session" position="top">
+          <button onClick={handleCopy} className="p-2 rounded-full hover:bg-g-surface-container transition-colors" style={{ color: "var(--g-outline)" }}>
+            <Copy className="w-4 h-4" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Clear all" position="top">
+          <button onClick={handleClear} className="p-2 rounded-full hover:bg-g-surface-container transition-colors" style={{ color: "var(--g-outline)" }}>
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
 
       {copied && (
@@ -121,6 +127,8 @@ export const TraceViewer = ({ onBack }: TraceViewerProps) => {
 
 const TraceEntryRow = ({ entry, baseTime }: { entry: TraceEntry; baseTime: number }) => {
   const [expanded, setExpanded] = useState(entry.type === "agent_text" || entry.type === "tool_call");
+  const [rerunResult, setRerunResult] = useState<string | null>(null);
+  const [rerunning, setRerunning] = useState(false);
   const cfg = TYPE_CONFIG[entry.type];
   if (!cfg) return null;
   const Icon = cfg.icon;
@@ -129,8 +137,26 @@ const TraceEntryRow = ({ entry, baseTime }: { entry: TraceEntry; baseTime: numbe
     return null;
   }
 
+  const isToolCall = entry.type === "tool_call";
   const isMarkdown = entry.type === "agent_text";
   const hasMeta = entry.meta && Object.keys(entry.meta).length > 0;
+
+  const handleRerun = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (rerunning) return;
+    setRerunning(true);
+    setRerunResult(null);
+    try {
+      const args = (entry.meta?.args as Record<string, unknown>) || {};
+      const result = await executeTool(entry.content, args);
+      setRerunResult(JSON.stringify(result, null, 2));
+    } catch (err) {
+      setRerunResult("Error: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setRerunning(false);
+      setExpanded(true);
+    }
+  };
 
   return (
     <div className="group">
@@ -145,13 +171,26 @@ const TraceEntryRow = ({ entry, baseTime }: { entry: TraceEntry; baseTime: numbe
           <Icon className="w-3 h-3" style={{ color: cfg.color }} />
         </div>
         <span className="text-xs font-google-text flex-1 truncate" style={{ color: cfg.color }}>
-          {entry.type === "tool_call" ? entry.content : entry.type === "agent_text" ? "Response" : entry.content.slice(0, 120)}
+          {isToolCall ? entry.content : entry.type === "agent_text" ? "Response" : entry.content.slice(0, 120)}
         </span>
-        {(hasMeta || entry.content.length > 120) && (
-          expanded
-            ? <ChevronDown className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "var(--g-outline)" }} />
-            : <ChevronRight className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "var(--g-outline)" }} />
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {isToolCall && (
+            <Tooltip text="Rerun tool" position="top">
+              <span
+                onClick={handleRerun}
+                className="p-0.5 rounded-full transition-colors hover:bg-g-surface-container-high"
+                style={{ color: "var(--g-outline)" }}
+              >
+                <RotateCw className={`w-3 h-3 ${rerunning ? "animate-spin" : ""}`} />
+              </span>
+            </Tooltip>
+          )}
+          {(hasMeta || entry.content.length > 120) && (
+            expanded
+              ? <ChevronDown className="w-3.5 h-3.5 mt-0.5" style={{ color: "var(--g-outline)" }} />
+              : <ChevronRight className="w-3.5 h-3.5 mt-0.5" style={{ color: "var(--g-outline)" }} />
+          )}
+        </div>
       </button>
       {expanded && (
         <div className="ml-[56px] pb-2">
@@ -163,6 +202,11 @@ const TraceEntryRow = ({ entry, baseTime }: { entry: TraceEntry; baseTime: numbe
           {hasMeta && (
             <pre className="mt-1.5 text-[10px] rounded-g-sm px-2.5 py-1.5 overflow-x-auto" style={{ background: "var(--g-surface-dim)", color: "var(--g-outline)", border: "1px solid var(--g-outline-variant)" }}>
               {JSON.stringify(entry.meta, null, 2)}
+            </pre>
+          )}
+          {rerunResult && (
+            <pre className="mt-1.5 text-[10px] rounded-g-sm px-2.5 py-1.5 overflow-x-auto" style={{ background: "var(--g-blue-bg)", color: "var(--g-blue)", border: "1px solid var(--g-blue-light)" }}>
+              {rerunResult}
             </pre>
           )}
         </div>

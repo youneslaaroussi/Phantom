@@ -30,6 +30,8 @@ import { getSavedPersonaId, savePersonaId, getPersona, type Persona } from "./pe
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
 import { buildMemoryContext, summarizeSession } from "./memory/index";
 import { playPageLaunchEffect, playPageVisionEffect, playPageAudioEffect } from "./page-effects";
+import { startSpotlight, stopSpotlight } from "./spotlight";
+import { buildSessionContext } from "./context";
 
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 
@@ -37,8 +39,8 @@ const TOOL_GUIDELINES = `
 
 Guidelines:
 - When asked to do something on a page, use getAccessibilitySnapshot first to understand the interactive elements
-- After clicking or filling, briefly confirm what you did
-- If something fails, explain what went wrong and try an alternative approach
+- After using a tool, confirm what happened naturally, as if you did it yourself. Don't mention tool names or describe your internal process.
+- If something fails, try an alternative approach. Only explain if you're stuck.
 - Don't read long text aloud — summarize it instead
 - Keep responses SHORT — the user is listening, not reading. 1-2 sentences max unless they ask for detail.
 - You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.
@@ -86,6 +88,8 @@ interface SessionContextValue {
   setVisionEnabled: (enabled: boolean) => void;
   tabAudioEnabled: boolean;
   setTabAudioEnabled: (enabled: boolean) => void;
+  spotlightEnabled: boolean;
+  setSpotlightEnabled: (enabled: boolean) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -106,6 +110,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [persona, setPersonaState] = useState<Persona>(getPersona("default"));
   const [visionEnabled, setVisionEnabledState] = useState(false);
   const [tabAudioEnabled, setTabAudioEnabledState] = useState(false);
+  const [spotlightEnabled, setSpotlightEnabledState] = useState(false);
   const sessionTranscriptRef = useRef<string[]>([]);
   const sessionToolCallsRef = useRef<string[]>([]);
 
@@ -123,8 +128,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       addTrace("system", "Tab audio capture started");
       playPageAudioEffect().catch(() => {});
       try {
-        await startTabAudio((base64) => {
-          sessionRef.current?.sendAudioBase64(base64);
+        await startTabAudio((pcm) => {
+          return sessionRef.current?.pushTabAudio(pcm) ?? false;
         });
         sessionRef.current?.sendText("[SYSTEM] You can now hear the audio playing in the user's browser tab. Listen and respond to what you hear.");
       } catch (err) {
@@ -176,7 +181,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     const session = new LiveSession(
       {
         model: MODEL,
-        systemInstruction: persona.prompt + TOOL_GUIDELINES + memoryContext + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
+        systemInstruction: persona.prompt + TOOL_GUIDELINES + memoryContext + buildSessionContext() + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
         tools,
         responseModalities: ["AUDIO"],
         voice,
@@ -262,7 +267,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     endTrace();
     stopVision();
     stopTabAudio();
+    stopSpotlight();
     setTabAudioEnabledState(false);
+    setSpotlightEnabledState(false);
 
     // Summarize session before cleanup (fire and forget)
     const transcript = sessionTranscriptRef.current.join("\n");
@@ -309,10 +316,39 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       startVision((base64, mimeType) => {
         sessionRef.current?.sendImage(base64, mimeType);
       }, persona.image);
-    } else {
+    } else if (!visionEnabled) {
       stopVision();
     }
   }, [state.status, visionEnabled]);
+
+  // Spotlight toggle
+  const setSpotlightEnabled = useCallback((enabled: boolean) => {
+    setSpotlightEnabledState(enabled);
+    if (enabled && sessionRef.current?.isConnected()) {
+      addTrace("system", "Spotlight enabled");
+      startSpotlight((context) => {
+        sessionRef.current?.sendText(context);
+      }, persona.image);
+      sessionRef.current?.sendText("[SYSTEM] Spotlight is now active. You will receive context about the DOM element the user is pointing at with their cursor. Use this to understand what the user is focused on. Only comment on it if the user asks or if it's relevant to the conversation.");
+    } else {
+      addTrace("system", "Spotlight disabled");
+      stopSpotlight();
+      if (sessionRef.current?.isConnected()) {
+        sessionRef.current?.sendText("[SYSTEM] Spotlight is now off. You no longer receive cursor context.");
+      }
+    }
+  }, [persona.image]);
+
+  // Start/stop spotlight when connection state changes
+  useEffect(() => {
+    if (spotlightEnabled && state.status === "connected" && sessionRef.current) {
+      startSpotlight((context) => {
+        sessionRef.current?.sendText(context);
+      }, persona.image);
+    } else {
+      stopSpotlight();
+    }
+  }, [state.status, spotlightEnabled]);
 
   const startListening = useCallback(async (deviceId?: string) => {
     if (!sessionRef.current?.isConnected()) {
@@ -360,11 +396,18 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     }
     if (state.status === "disconnected") {
       wasConnectedRef.current = false;
+      if (isTabAudioActive()) {
+        stopTabAudio();
+        setTabAudioEnabledState(false);
+      }
     }
   }, [state.status, state.closeCode, connect]);
 
   useEffect(() => {
-    return () => { sessionRef.current?.disconnect(); };
+    return () => {
+      sessionRef.current?.disconnect();
+      stopSpotlight();
+    };
   }, []);
 
   return (
@@ -388,6 +431,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setVisionEnabled,
         tabAudioEnabled,
         setTabAudioEnabled,
+        spotlightEnabled,
+        setSpotlightEnabled,
       }}
     >
       {children}

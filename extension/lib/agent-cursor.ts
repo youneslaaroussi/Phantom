@@ -1,72 +1,82 @@
 /**
- * Agent Cursor — visual indicator of where Phantom is clicking.
+ * Agent Cursor — visual indicator of where Phantom is clicking/scrolling.
  *
- * Shows a Google-style animated cursor on the page when:
+ * Shows a Google-style animated ring on the page when:
  * - DOM tools click an element (via CSS selector)
  * - Computer Use clicks at coordinates
+ * - Scroll actions are performed
  *
- * The cursor is a small SVG injected into the page via content script,
- * with a smooth move animation + ripple on click.
+ * The cursor slides in from a random screen edge, performs the action,
+ * then fades/slides out.
  */
 
-// Injected into the page — shows cursor moving to target and clicking
+function randomEdgeStart(x: number, y: number) {
+  const edges = [
+    { left: x, top: -60 },
+    { left: x, top: window.innerHeight + 60 },
+    { left: -60, top: y },
+    { left: window.innerWidth + 60, top: y },
+  ];
+  return edges[Math.floor(Math.random() * edges.length)];
+}
+
 export function showAgentCursor(x: number, y: number): void {
-  // Remove existing cursor
   const existing = document.getElementById("phantom-agent-cursor");
   if (existing) existing.remove();
 
-  // Create cursor container
   const cursor = document.createElement("div");
   cursor.id = "phantom-agent-cursor";
   cursor.innerHTML = `
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.2))">
-      <path d="M5 3L19 12L12 13L9 20L5 3Z" fill="#4285F4" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
-    </svg>
-    <div id="phantom-cursor-ripple" style="
-      position:absolute; top:50%; left:50%;
-      width:0; height:0; border-radius:50%;
-      background:rgba(66,133,244,0.3);
+    <div style="
+      width:48px; height:48px; border-radius:24px;
+      background:rgba(66,133,244,0.15);
+      border:2.5px solid #4285F4;
+      box-shadow:0 0 16px rgba(66,133,244,0.25), 0 0 4px rgba(66,133,244,0.15);
       transform:translate(-50%,-50%);
+    "></div>
+    <div id="phantom-cursor-ripple" style="
+      position:absolute; top:0; left:0;
+      width:48px; height:48px; border-radius:50%;
+      background:rgba(66,133,244,0.2);
+      transform:translate(-50%,-50%) scale(1);
       pointer-events:none;
+      opacity:1;
     "></div>
   `;
+
+  const start = randomEdgeStart(x, y);
   cursor.style.cssText = `
     position:fixed; z-index:2147483646; pointer-events:none;
     transition:left 0.4s cubic-bezier(0.4,0,0.2,1), top 0.4s cubic-bezier(0.4,0,0.2,1);
-    left:-40px; top:-40px;
+    left:${start.left}px; top:${start.top}px;
   `;
 
   document.body.appendChild(cursor);
 
-  // Animate cursor to target position
   requestAnimationFrame(() => {
     cursor.style.left = x + "px";
     cursor.style.top = y + "px";
   });
 
-  // Ripple on arrival
   setTimeout(() => {
     const ripple = document.getElementById("phantom-cursor-ripple");
     if (ripple) {
-      ripple.style.transition = "width 0.3s ease-out, height 0.3s ease-out, opacity 0.3s ease-out";
-      ripple.style.width = "40px";
-      ripple.style.height = "40px";
+      ripple.style.transition = "transform 0.5s cubic-bezier(0.4,0,0.2,1), opacity 0.5s ease-out";
+      ripple.style.transform = "translate(-50%,-50%) scale(2.5)";
       ripple.style.opacity = "0";
     }
   }, 420);
 
-  // Fade out and remove
   setTimeout(() => {
-    cursor.style.transition = "opacity 0.3s ease-out";
+    cursor.style.transition = "opacity 0.5s ease-out";
     cursor.style.opacity = "0";
-  }, 900);
+  }, 2000);
 
   setTimeout(() => {
     cursor.remove();
-  }, 1200);
+  }, 2500);
 }
 
-// Show cursor at a CSS selector target
 export function showAgentCursorAtSelector(selector: string): void {
   const el = document.querySelector(selector) as HTMLElement | null;
   if (!el) return;
@@ -76,7 +86,72 @@ export function showAgentCursorAtSelector(selector: string): void {
   showAgentCursor(x, y);
 }
 
-// Idle cursor that drifts with noise — for when computer use is thinking
+export function showScrollCursor(x: number, y: number, direction: "up" | "down", amount?: number): void {
+  const existing = document.getElementById("phantom-agent-cursor");
+  if (existing) existing.remove();
+
+  const isDown = direction === "down";
+  const scrollAmount = amount || 400;
+  const scrollDuration = 800;
+  const drift = isDown ? 150 : -150;
+
+  const cursor = document.createElement("div");
+  cursor.id = "phantom-agent-cursor";
+  cursor.innerHTML = `
+    <div style="
+      width:48px; height:48px; border-radius:24px;
+      background:rgba(66,133,244,0.15);
+      border:2.5px solid #4285F4;
+      box-shadow:0 0 16px rgba(66,133,244,0.25), 0 0 4px rgba(66,133,244,0.15);
+      transform:translate(-50%,-50%);
+    "></div>
+  `;
+
+  const start = randomEdgeStart(x, y);
+  cursor.style.cssText = `
+    position:fixed; z-index:2147483646; pointer-events:none;
+    transition:left 0.4s cubic-bezier(0.4,0,0.2,1), top 0.4s cubic-bezier(0.4,0,0.2,1);
+    left:${start.left}px; top:${start.top}px;
+  `;
+
+  document.body.appendChild(cursor);
+
+  requestAnimationFrame(() => {
+    cursor.style.left = x + "px";
+    cursor.style.top = y + "px";
+  });
+
+  setTimeout(() => {
+    cursor.style.transition = `top ${scrollDuration}ms cubic-bezier(0.4,0,0.2,1)`;
+    cursor.style.top = (y + drift) + "px";
+
+    const startScroll = window.scrollY;
+    const targetScroll = startScroll + (isDown ? scrollAmount : -scrollAmount);
+    const startTime = performance.now();
+
+    function animateScroll(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / scrollDuration, 1);
+      const ease = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      window.scrollTo(0, startScroll + (targetScroll - startScroll) * ease);
+      if (progress < 1) requestAnimationFrame(animateScroll);
+    }
+    requestAnimationFrame(animateScroll);
+  }, 450);
+
+  setTimeout(() => {
+    cursor.style.transition = "top 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.4s ease-out";
+    cursor.style.top = (isDown ? window.innerHeight + 60 : -60) + "px";
+    cursor.style.opacity = "0";
+  }, 450 + scrollDuration + 200);
+
+  setTimeout(() => {
+    cursor.remove();
+  }, 450 + scrollDuration + 700);
+}
+
 let idleInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startIdleCursor(baseX: number, baseY: number): void {
@@ -85,9 +160,12 @@ export function startIdleCursor(baseX: number, baseY: number): void {
   const cursor = document.createElement("div");
   cursor.id = "phantom-idle-cursor";
   cursor.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity:0.6;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.15))">
-      <path d="M5 3L19 12L12 13L9 20L5 3Z" fill="#4285F4" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
-    </svg>
+    <div style="
+      width:48px; height:48px; border-radius:24px;
+      background:rgba(66,133,244,0.1);
+      border:2px solid rgba(66,133,244,0.3);
+      transform:translate(-50%,-50%);
+    "></div>
   `;
   cursor.style.cssText = `
     position:fixed; z-index:2147483646; pointer-events:none;
@@ -98,12 +176,10 @@ export function startIdleCursor(baseX: number, baseY: number): void {
 
   document.body.appendChild(cursor);
 
-  // Fade in
   requestAnimationFrame(() => {
     cursor.style.opacity = "0.6";
   });
 
-  // Drift with Perlin-like noise
   let t = 0;
   idleInterval = setInterval(() => {
     t += 0.3;
@@ -111,8 +187,6 @@ export function startIdleCursor(baseX: number, baseY: number): void {
     const ny = baseY + Math.cos(t * 0.5) * 10 + Math.sin(t * 1.1) * 5;
     cursor.style.left = nx + "px";
     cursor.style.top = ny + "px";
-
-    // Subtle opacity pulse
     cursor.style.opacity = String(0.4 + Math.sin(t * 0.4) * 0.2);
   }, 800);
 }

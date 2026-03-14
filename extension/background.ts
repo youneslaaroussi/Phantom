@@ -1,12 +1,13 @@
 /**
  * Background service worker
- * 
- * Opens side panel on extension icon click.
- * Handles keyboard shortcuts.
+ *
+ * Icon click opens popup (grants activeTab, pre-captures tab audio stream).
+ * Sidepanel opens via keyboard shortcut or right-click context menu.
+ * First click also opens sidepanel via onInstalled.
  */
 
 chrome.sidePanel
-  .setPanelBehavior({ openPanelOnActionClick: true })
+  .setPanelBehavior({ openPanelOnActionClick: false })
   .catch(console.error);
 
 // Keyboard shortcut handling
@@ -22,11 +23,10 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
-// Tab audio capture — sidepanel requests stream ID from background
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "get-tab-audio-stream-id") {
     const tabId = message.tabId;
-    chrome.tabCapture.getMediaStreamId({ consumerTabId: tabId }, (streamId) => {
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId, consumerTabId: tabId }, (streamId) => {
       if (chrome.runtime.lastError) {
         sendResponse({ error: chrome.runtime.lastError.message });
       } else {

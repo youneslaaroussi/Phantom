@@ -14,7 +14,8 @@
 
 import { getServerUrl } from "./connection-mode";
 import { addTrace } from "./trace";
-import { showAgentCursor } from "./agent-cursor";
+
+import { compressScreenshot } from "./image";
 
 // Configurable — swap to gemini-3.1-flash-preview when computer use lands there
 const COMPUTER_USE_MODEL = "gemini-3-flash-preview";
@@ -157,11 +158,10 @@ async function captureScreenshot(): Promise<{ base64: string; mimeType: string }
 
     const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
       format: "jpeg",
-      quality: 80, // Higher quality than vision streaming for better accuracy
+      quality: 80,
     });
 
-    const base64 = dataUrl.replace(/^data:image\/jpeg;base64,/, "");
-    return { base64, mimeType: "image/jpeg" };
+    return await compressScreenshot(dataUrl);
   } catch {
     return null;
   }
@@ -185,7 +185,7 @@ async function executeAction(
       // Show agent cursor before clicking
       await chrome.scripting.executeScript({
         target: { tabId },
-        func: showAgentCursor,
+        func: _injectClickCursorAt,
         args: [x, y],
       });
       await sleep(450); // Wait for cursor animation
@@ -353,4 +353,32 @@ async function getViewportSize(tabId: number): Promise<{ width: number; height: 
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function _injectClickCursorAt(x: number, y: number) {
+  const existing = document.getElementById("phantom-agent-cursor");
+  if (existing) existing.remove();
+
+  const cursor = document.createElement("div");
+  cursor.id = "phantom-agent-cursor";
+  cursor.innerHTML = `<div style="width:48px;height:48px;border-radius:24px;background:rgba(66,133,244,0.15);border:2.5px solid #4285F4;box-shadow:0 0 16px rgba(66,133,244,0.25),0 0 4px rgba(66,133,244,0.15);transform:translate(-50%,-50%);"></div><div id="phantom-cursor-ripple" style="position:absolute;top:0;left:0;width:48px;height:48px;border-radius:50%;background:rgba(66,133,244,0.2);transform:translate(-50%,-50%) scale(1);pointer-events:none;opacity:1;"></div>`;
+
+  const edges = [
+    { left: x, top: -60 },
+    { left: x, top: window.innerHeight + 60 },
+    { left: -60, top: y },
+    { left: window.innerWidth + 60, top: y },
+  ];
+  const start = edges[Math.floor(Math.random() * edges.length)];
+  cursor.style.cssText = `position:fixed;z-index:2147483646;pointer-events:none;transition:left 0.4s cubic-bezier(0.4,0,0.2,1),top 0.4s cubic-bezier(0.4,0,0.2,1);left:${start.left}px;top:${start.top}px;`;
+
+  document.body.appendChild(cursor);
+  requestAnimationFrame(() => { cursor.style.left = x + "px"; cursor.style.top = y + "px"; });
+
+  setTimeout(() => {
+    const ripple = document.getElementById("phantom-cursor-ripple");
+    if (ripple) { ripple.style.transition = "transform 0.5s cubic-bezier(0.4,0,0.2,1),opacity 0.5s ease-out"; ripple.style.transform = "translate(-50%,-50%) scale(2.5)"; ripple.style.opacity = "0"; }
+  }, 420);
+  setTimeout(() => { cursor.style.transition = "opacity 0.5s ease-out"; cursor.style.opacity = "0"; }, 2000);
+  setTimeout(() => { cursor.remove(); }, 2500);
 }

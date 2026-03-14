@@ -55,6 +55,48 @@ Sensitive content is automatically blurred before any screenshot reaches the AI.
 | **Context compression** | Sliding window for longer sessions |
 | **Affective dialog** | Model reads tone and emotion from your voice |
 
+## 🧩 Google Technology Stack
+
+| Technology | Usage | Where |
+|---|---|---|
+| **Gemini 2.5 Flash Native Audio** | Real-time voice conversations via Live API (WebSocket) | Extension ↔ Server |
+| **Gemini Live API** | Bidirectional audio streaming, function calling, session resumption | Extension ↔ Server |
+| **Native Audio Output** | HD voice synthesis with 30 voices, 24 languages | Server (Gemini SDK) |
+| **Affective Dialog** | Model reads tone and emotion from user's voice | Server (`v1alpha`) |
+| **Proactive Audio** | Model decides when to respond vs. stay silent | Server (`v1alpha`) |
+| **Context Window Compression** | Sliding window for extended sessions beyond 15min | Server config |
+| **Audio Transcription** | Real-time input/output speech-to-text | Server config |
+| **Google Search Grounding** | Model can search the web for current information | Server (tool) |
+| **@google/genai SDK** | Server-side Gemini Live session management | Server |
+| **Google Cloud Run** | Hosts WebSocket proxy server, auto-scaling | Server deployment |
+| **Google Fonts** | Google Sans / Google Sans Text typography | Extension + Website |
+
+### 🔌 Chrome Extension APIs
+
+| API | Usage |
+|---|---|
+| `chrome.sidePanel` | Main UI lives in the Chrome side panel |
+| `chrome.scripting` | Inject scripts for clicks, scrolling, typing, DOM reading, page effects |
+| `chrome.tabs` | Tab management, navigation, switching, querying |
+| `chrome.tabCapture` | Stream tab audio to the AI model |
+| `chrome.storage` | Persist settings, personas, traces, memories locally |
+| `chrome.runtime` | Background messaging, asset URLs, extension lifecycle |
+| `chrome.commands` | Global keyboard shortcut (Alt+P) for voice toggle |
+| `host_permissions` | `<all_urls>` for script injection on any page |
+| `Manifest V3` | Modern extension platform with service worker |
+
+### 🌐 Chrome Web Platform APIs
+
+| API | Usage |
+|---|---|
+| `WebSocket` | Persistent connection to Gemini Live API via proxy |
+| `MediaDevices.getUserMedia` | Microphone capture for voice input |
+| `AudioContext / ScriptProcessor` | PCM audio processing for Gemini-compatible format |
+| `navigator.permissions` | Check/request microphone permission state |
+| `WebGL` | GPU-accelerated page launch effects (ripple, vortex, shatter) and wave visualizer |
+| `CSS Animations` | Page-injected effects (iris, EQ bars, sparkles, shatter fragments) |
+| `WASM` | Local embedding model (all-MiniLM-L6-v2) via Transformers.js |
+
 ## Quick Start
 
 ### 1. Install the extension
