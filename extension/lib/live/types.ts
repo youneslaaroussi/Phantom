@@ -101,6 +101,8 @@ export interface BidiServerMessage {
     turnComplete?: boolean;
     interrupted?: boolean;
     generationComplete?: boolean;
+    inputTranscription?: { text: string };
+    outputTranscription?: { text: string };
   };
   toolCall?: {
     functionCalls: Array<{
@@ -112,15 +114,25 @@ export interface BidiServerMessage {
   toolCallCancellation?: {
     ids: string[];
   };
+  sessionResumptionUpdate?: {
+    newHandle?: string;
+    resumable?: boolean;
+  };
+  goAway?: {
+    timeLeft?: string;
+  };
 }
 
 export interface LiveSessionCallbacks {
   onStateChange?: (state: LiveSessionState) => void;
   onTranscript?: (text: string, isFinal: boolean) => void;
+  onInputTranscription?: (text: string) => void;
+  onOutputTranscription?: (text: string) => void;
   onToolCall?: (toolCall: ToolCallRequest) => Promise<Record<string, unknown>>;
   onToolStart?: (toolCall: { name: string; id: string }) => void;
   onToolEnd?: (toolCall: { name: string; id: string; success: boolean }) => void;
   onAudioOutput?: (audioData: ArrayBuffer) => void;
   onOutputLevel?: (level: number) => void;
   onError?: (error: Error) => void;
+  onGoAway?: (timeLeft?: string) => void;
 }

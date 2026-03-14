@@ -31,6 +31,7 @@ export class LiveSession {
     isListening: false,
     isSpeaking: false,
   };
+  private resumptionHandle: string | null = null;
 
   constructor(config: LiveSessionConfig, callbacks: LiveSessionCallbacks = {}) {
     this.config = config;
@@ -135,6 +136,14 @@ export class LiveSession {
       config.tools = this.config.tools;
     }
 
+    // Session resumption — pass handle if reconnecting
+    if (this.resumptionHandle) {
+      config.sessionResumption = { handle: this.resumptionHandle };
+      console.log("[LiveSession] Reconnecting with resumption handle");
+    } else {
+      config.sessionResumption = {};
+    }
+
     const msg = { setup: config };
     console.log("[LiveSession] Setup message:", JSON.stringify(msg).slice(0, 500));
     this.ws.send(JSON.stringify(msg));
@@ -153,7 +162,19 @@ export class LiveSession {
 
       const message: BidiServerMessage = JSON.parse(textData);
 
-      if (!message.setupComplete && !message.serverContent && !message.toolCall && !message.toolCallCancellation) {
+      // Handle session resumption updates
+      if (message.sessionResumptionUpdate?.newHandle) {
+        this.resumptionHandle = message.sessionResumptionUpdate.newHandle;
+        console.log("[LiveSession] Got resumption handle");
+      }
+
+      // Handle GoAway — server is about to disconnect
+      if (message.goAway) {
+        console.log("[LiveSession] GoAway received, time left:", message.goAway.timeLeft);
+        this.callbacks.onGoAway?.(message.goAway.timeLeft);
+      }
+
+      if (!message.setupComplete && !message.serverContent && !message.toolCall && !message.toolCallCancellation && !message.sessionResumptionUpdate && !message.goAway) {
         console.log("[LiveSession] Unknown/error message:", textData.slice(0, 500));
       }
 
@@ -185,6 +206,14 @@ export class LiveSession {
               this.callbacks.onTranscript?.(part.text, content.turnComplete ?? false);
             }
           }
+        }
+
+        // Audio transcriptions
+        if (content.inputTranscription?.text) {
+          this.callbacks.onInputTranscription?.(content.inputTranscription.text);
+        }
+        if (content.outputTranscription?.text) {
+          this.callbacks.onOutputTranscription?.(content.outputTranscription.text);
         }
 
         if (content.turnComplete) {
@@ -394,5 +423,9 @@ export class LiveSession {
 
   isConnected(): boolean {
     return this.state.status === "connected";
+  }
+
+  getResumptionHandle(): string | null {
+    return this.resumptionHandle;
   }
 }
