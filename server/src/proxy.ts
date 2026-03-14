@@ -42,6 +42,7 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
   let setupReceived = false;
   const buffer: string[] = [];
   let inputGated = false;
+  let lastVideoFrame: any = null;
 
   async function initSession(setupMsg: Record<string, unknown>) {
     const ai = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: "v1alpha" } });
@@ -124,6 +125,10 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
             }
             if (message.serverContent?.turnComplete) {
               inputGated = false;
+              if (lastVideoFrame && session) {
+                try { session.sendRealtimeInput({ video: lastVideoFrame }); } catch {}
+                lastVideoFrame = null;
+              }
             }
             clientWs.send(JSON.stringify(message));
           },
@@ -185,8 +190,11 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
 
     try {
       if (msg.realtimeInput) {
-        if (inputGated) return;
         const ri = msg.realtimeInput as Record<string, unknown>;
+        if (inputGated) {
+          if (ri.video) lastVideoFrame = ri.video;
+          return;
+        }
         if (ri.audio) {
           session.sendRealtimeInput({ audio: ri.audio as any });
         }
