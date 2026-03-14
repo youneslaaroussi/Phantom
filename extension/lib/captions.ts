@@ -7,9 +7,6 @@ export async function showCaption(text: string, role: "user" | "agent"): Promise
     accumulated = "";
     currentRole = role;
   }
-  if (accumulated && !accumulated.endsWith(" ") && !text.startsWith(" ")) {
-    accumulated += " ";
-  }
   accumulated += text;
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

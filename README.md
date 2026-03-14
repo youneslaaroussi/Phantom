@@ -39,6 +39,8 @@ Voice-powered AI agent for Chrome — clicks, scrolls, reads, and navigates for 
   - [Personas](#personas)
   - [Tab Audio Streaming](#tab-audio-streaming)
   - [Session Resumption](#session-resumption)
+  - [Browser Events — Proactive Agent Loop](#browser-events--proactive-agent-loop)
+  - [Session Continuity — Reconnect with Trace](#session-continuity--reconnect-with-trace)
 - [Features](#features)
 - [Google Technology Stack](#google-technology-stack)
 - [Codebase Structure](#codebase-structure)
@@ -217,6 +219,39 @@ Gemini Live API connections have a time limit. When the server sends a `GoAway` 
 3. The resumption handle is sent in the new `setup` message, allowing Gemini to restore conversation state
 4. The user experiences a brief pause but no data loss
 
+### Browser Events — Proactive Agent Loop
+
+<div align="center">
+<img src="docs/browser-events.svg" alt="Browser Events — Proactive Agent Loop" />
+</div>
+
+Without external signals, the agent goes silent after executing a tool — it gets the tool result back but has no idea the world changed. A page loaded, a tab switched, a title updated. The agent just... stops.
+
+The **Events module** (`extension/lib/events.ts`) solves this by listening to Chrome browser events and forwarding them to Gemini as `[EVENT]` text messages:
+
+| Event | Chrome API | Message Sent |
+|-------|-----------|--------------|
+| **Page loaded** | `chrome.tabs.onUpdated` (status=complete) | `[EVENT] Page loaded: "Pizza Menu" — https://...` |
+| **Tab switched** | `chrome.tabs.onActivated` | `[EVENT] Switched to tab: "Gmail" — https://...` |
+| **Title changed** | `chrome.tabs.onUpdated` (title change) | `[EVENT] Page title changed: "Order Confirmed"` |
+
+This creates a proactive loop: the agent calls `openTab` → the page loads → the Events module fires `[EVENT] Page loaded` → Gemini sees the new page and decides what to do next → calls another tool → the page changes again → and so on. The agent stays in the loop instead of going silent.
+
+### Session Continuity — Reconnect with Trace
+
+<div align="center">
+<img src="docs/session-continuity.svg" alt="Session Continuity — Reconnect with Trace" />
+</div>
+
+When the WebSocket drops unexpectedly mid-conversation, the auto-reconnect creates a new session — but the agent has no memory of what just happened. Previously, it would say "Hi!" again and the user had to re-explain everything.
+
+Now, on unexpected disconnect:
+
+1. The full session transcript is **stashed** before reconnecting
+2. After the new session connects, the last 30 transcript entries are **injected** as a `[SYSTEM]` message
+3. The agent sees the conversation history and **continues naturally** from where it left off
+4. No re-introduction, no context loss
+
 ---
 
 ## Features
@@ -233,6 +268,8 @@ Gemini Live API connections have a time limit. When the server sends a `GoAway` 
 | **Computer use** | AI vision coordinate clicking for canvas, iframes, complex UIs |
 | **Tab audio** | Stream page audio to the model — it can hear what you hear |
 | **Session resumption** | Seamless reconnect after WebSocket resets |
+| **Browser events** | Page loads, tab switches, and title changes pushed to agent for proactive continuity |
+| **Session continuity** | Conversation transcript injected on reconnect so agent picks up where it left off |
 | **Context compression** | Sliding window for longer sessions |
 | **Affective dialog** | Model reads tone and emotion from your voice |
 
@@ -301,6 +338,7 @@ phantom/
 │   ├── lib/
 │   │   ├── session.tsx         # Session provider — orchestrates everything
 │   │   ├── tools.ts            # 20 tool declarations + executeTool()
+│   │   ├── events.ts           # Browser event loop for proactive agent continuity
 │   │   ├── computer-use.ts     # Vision-based AI clicking pipeline
 │   │   ├── content-actions.ts  # On-page AI popups (summarize, rewrite)
 │   │   ├── tab-audio.ts        # Tab audio capture + tab-switch handling

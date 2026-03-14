@@ -34,7 +34,7 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
   const [embeddingReady, setEmbeddingReady] = useState(false);
   const [embeddingLoading, setEmbeddingLoading] = useState(false);
   const [embeddingProgress, setEmbeddingProgress] = useState(0);
-  const [soundAllowed, setSoundAllowed] = useState(true);
+  const soundAllowed = true;
   const idx = PERSONAS.findIndex((p) => p.id === selected.id);
   const color = getColor(selected.id);
   const [dragOffset, setDragOffset] = useState(0);
@@ -50,11 +50,7 @@ export const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
         if (status.state === "granted") setMicGranted(true);
         status.onchange = () => { if (status.state === "granted") setMicGranted(true); };
       } catch {}
-      try {
-        const audio = new Audio();
-        audio.volume = 0;
-        await audio.play().then(() => { audio.pause(); setSoundAllowed(true); }).catch(() => setSoundAllowed(false));
-      } catch { setSoundAllowed(false); }
+
       if (isModelReady()) {
         setEmbeddingReady(true);
         setEmbeddingProgress(100);

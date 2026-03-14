@@ -33,6 +33,7 @@ import { playPageLaunchEffect, playPageVisionEffect, playPageAudioEffect } from 
 import { startSpotlight, stopSpotlight } from "./spotlight";
 import { buildSessionContext } from "./context";
 import { showCaption } from "./captions";
+import { startEvents, stopEvents } from "./events";
 
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 
@@ -177,7 +178,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const reconnectTranscriptRef = useRef<string[] | null>(null);
+
   const connect = useCallback(async () => {
+    const previousTranscript = reconnectTranscriptRef.current;
+    reconnectTranscriptRef.current = null;
+
     if (sessionRef.current) {
       sessionRef.current.disconnect();
       sessionRef.current = null;
@@ -185,9 +191,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const tools = getToolDeclarations();
 
-    // Reset session tracking
-    sessionTranscriptRef.current = [];
-    sessionToolCallsRef.current = [];
+    if (!previousTranscript) {
+      sessionTranscriptRef.current = [];
+      sessionToolCallsRef.current = [];
+    }
 
     // Build memory context to inject into system prompt
     let memoryContext = "";
@@ -273,9 +280,20 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       addTrace("system", "Connected");
       playConnect();
       toast("success", "Connected");
+      startEvents((text) => {
+        if (sessionRef.current?.isConnected()) {
+          addTrace("system", text);
+          sessionRef.current.sendText(text);
+        }
+      });
       // Immersive launch effect on the actual page
       playPageLaunchEffect(persona.image).catch(() => {});
-      session.sendText("Say hi! Greet the user briefly in character. Keep it to one short sentence.");
+      if (previousTranscript && previousTranscript.length > 0) {
+        const traceWindow = previousTranscript.slice(-30).join("\n");
+        session.sendText(`[SYSTEM] You were disconnected mid-conversation. Here is the conversation so far:\n${traceWindow}\n\nContinue naturally from where we left off. Do NOT re-introduce yourself or say hi again.`);
+      } else {
+        session.sendText("Say hi! Greet the user briefly in character. Keep it to one short sentence.");
+      }
     } catch (err) {
       addTrace("error", `Connect failed: ${err instanceof Error ? err.message : String(err)}`);
       playError();
@@ -288,6 +306,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     playDisconnect();
     addTrace("system", "Disconnected");
     endTrace();
+    stopEvents();
     stopVision();
     stopTabAudio();
     stopSpotlight();
@@ -466,6 +485,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       wasConnectedRef.current = false;
       const timer = setTimeout(() => {
         console.log("[Phantom] Auto-reconnecting after unexpected disconnect...");
+        reconnectTranscriptRef.current = [...sessionTranscriptRef.current];
         connect().catch(() => {});
       }, 2000);
       return () => clearTimeout(timer);
@@ -482,6 +502,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     return () => {
       sessionRef.current?.disconnect();
+      stopEvents();
       stopSpotlight();
     };
   }, []);

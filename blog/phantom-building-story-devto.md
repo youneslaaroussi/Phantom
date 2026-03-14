@@ -58,6 +58,20 @@ The model has access to 20 browser tools via Gemini's function calling:
 
 Each tool plays its own sound effect (generated via ElevenLabs' SFX API) — a soft whoosh for navigation, crystal clicks for typing, gentle chimes for success.
 
+### The "dead zone" problem
+
+Here's something nobody warns you about when building AI agents: the model goes silent after tool calls.
+
+The agent calls `openTab` to search for pizza places. Chrome opens the tab, the page loads, Google shows results. But the agent? It got the tool result — `"Opened https://..."` — and just stopped. It had no idea a page loaded. It couldn't see that the search results appeared. It was sitting there, perfectly content, waiting for the user to say something.
+
+The fix was a **Browser Events module** — a tiny system that listens to Chrome browser APIs (`chrome.tabs.onUpdated`, `chrome.tabs.onActivated`) and pushes world-state changes to Gemini as `[EVENT]` text messages. When a page finishes loading, the agent gets `[EVENT] Page loaded: "Google Search — nearest pizza places"`. When the user switches tabs, the agent gets `[EVENT] Switched to tab: "Gmail"`.
+
+![Browser Events Loop](https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/browser-events.svg)
+
+This creates a proactive loop: **tool → browser event → tool → browser event**. The agent calls `openTab`, the page loads, the Events module fires a page-loaded event, Gemini sees the new page and decides to click a result, that click triggers another page load, another event fires, and the agent keeps going until the task is done.
+
+Without it, the agent acts once and stalls. With it, the agent chains actions autonomously.
+
 ## Privacy Shield: What the AI Never Sees
 
 Here's the uncomfortable truth about screen-sharing AI agents: they see everything. Your passwords. Your credit cards. Your API keys. Every token, every secret, every SSN on screen — all of it gets sent as JPEG frames to a remote model.

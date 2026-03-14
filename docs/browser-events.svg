@@ -1,0 +1,76 @@
+<svg viewBox="0 -20 800 340" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:24px auto;display:block;font-family:'Google Sans',sans-serif">
+  <defs>
+    <filter id="se"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
+    <marker id="ae" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#4285F4"/></marker>
+    <marker id="aeg" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#34A853"/></marker>
+    <marker id="aey" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#FBBC05"/></marker>
+    <marker id="aegr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#5F6368"/></marker>
+    <marker id="aer" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#EA4335"/></marker>
+  </defs>
+  <rect y="-20" width="800" height="340" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
+  <text x="400" y="8" text-anchor="middle" fill="#5F6368" font-size="11" font-weight="500">BROWSER EVENT LOOP — PROACTIVE AGENT CONTINUITY</text>
+
+  <!-- Web Page -->
+  <rect x="20" y="50" width="130" height="80" rx="12" fill="#fff" stroke="#e8eaed" stroke-width="1.5" filter="url(#se)"/>
+  <text x="85" y="82" text-anchor="middle" fill="#1f1f1f" font-size="13" font-weight="500">Web Page</text>
+  <text x="85" y="100" text-anchor="middle" fill="#5F6368" font-size="10">DOM + Navigation</text>
+
+  <!-- Chrome APIs -->
+  <rect x="190" y="50" width="130" height="80" rx="12" fill="#4285F4" filter="url(#se)"/>
+  <text x="255" y="82" text-anchor="middle" fill="#fff" font-size="12" font-weight="500">Chrome APIs</text>
+  <text x="255" y="100" text-anchor="middle" fill="#d2e3fc" font-size="10">tabs.onUpdated</text>
+  <text x="255" y="114" text-anchor="middle" fill="#d2e3fc" font-size="10">tabs.onActivated</text>
+
+  <!-- Events Module -->
+  <rect x="360" y="50" width="130" height="80" rx="12" fill="#34A853" filter="url(#se)"/>
+  <text x="425" y="82" text-anchor="middle" fill="#fff" font-size="12" font-weight="500">Events Module</text>
+  <text x="425" y="100" text-anchor="middle" fill="#e6f4ea" font-size="10">lib/events.ts</text>
+
+  <!-- Session -->
+  <rect x="530" y="50" width="120" height="80" rx="12" fill="#FBBC05" filter="url(#se)"/>
+  <text x="590" y="82" text-anchor="middle" fill="#1f1f1f" font-size="12" font-weight="500">Session</text>
+  <text x="590" y="100" text-anchor="middle" fill="#5F6368" font-size="10">sendText()</text>
+
+  <!-- Gemini -->
+  <rect x="690" y="50" width="90" height="80" rx="12" fill="#34A853" filter="url(#se)"/>
+  <text x="735" y="95" text-anchor="middle" fill="#fff" font-size="12" font-weight="500">Gemini</text>
+
+  <!-- Forward arrows -->
+  <line x1="150" y1="90" x2="188" y2="90" stroke="#5F6368" stroke-width="1.5" marker-end="url(#aegr)"/>
+  <line x1="320" y1="90" x2="358" y2="90" stroke="#4285F4" stroke-width="1.5" marker-end="url(#ae)"/>
+  <line x1="490" y1="90" x2="528" y2="90" stroke="#34A853" stroke-width="1.5" marker-end="url(#aeg)"/>
+  <line x1="650" y1="90" x2="688" y2="90" stroke="#FBBC05" stroke-width="1.5" marker-end="url(#aey)"/>
+
+  <!-- Event types container -->
+  <rect x="20" y="160" width="470" height="130" rx="10" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="255" y="180" text-anchor="middle" fill="#5F6368" font-size="9" font-weight="500">BROWSER EVENTS SENT AS [EVENT] TEXT MESSAGES</text>
+
+  <rect x="32" y="192" width="140" height="42" rx="8" fill="#fff" stroke="#4285F4" filter="url(#se)"/>
+  <text x="102" y="210" text-anchor="middle" fill="#4285F4" font-size="10" font-weight="500">Page Loaded</text>
+  <text x="102" y="224" text-anchor="middle" fill="#5F6368" font-size="9">title + URL on complete</text>
+
+  <rect x="184" y="192" width="140" height="42" rx="8" fill="#fff" stroke="#34A853" filter="url(#se)"/>
+  <text x="254" y="210" text-anchor="middle" fill="#34A853" font-size="10" font-weight="500">Tab Switched</text>
+  <text x="254" y="224" text-anchor="middle" fill="#5F6368" font-size="9">new tab title + URL</text>
+
+  <rect x="336" y="192" width="140" height="42" rx="8" fill="#fff" stroke="#FBBC05" filter="url(#se)"/>
+  <text x="406" y="210" text-anchor="middle" fill="#FBBC05" font-size="10" font-weight="500">Title Changed</text>
+  <text x="406" y="224" text-anchor="middle" fill="#5F6368" font-size="9">SPA navigation / ajax</text>
+
+  <!-- Proactivity loop -->
+  <rect x="530" y="160" width="250" height="130" rx="10" fill="none" stroke="#EA4335" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="655" y="180" text-anchor="middle" fill="#EA4335" font-size="9" font-weight="500">PROACTIVE AGENT LOOP</text>
+
+  <rect x="542" y="192" width="226" height="42" rx="8" fill="#fce8e6" stroke="#EA4335" stroke-width="0.5"/>
+  <text x="655" y="210" text-anchor="middle" fill="#EA4335" font-size="10" font-weight="500">Agent sees world changed</text>
+  <text x="655" y="224" text-anchor="middle" fill="#5F6368" font-size="9">continues acting without user prompt</text>
+
+  <rect x="542" y="244" width="226" height="36" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#se)"/>
+  <text x="655" y="266" text-anchor="middle" fill="#1f1f1f" font-size="10" font-weight="500">Tool call → page event → tool call → ...</text>
+
+  <!-- Return arrow (bottom) — agent acts again -->
+  <path d="M735,132 L735,300 L425,300 L425,236" fill="none" stroke="#EA4335" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#aer)"/>
+  <rect x="540" y="294" width="100" height="16" rx="4" fill="#fce8e6"/>
+  <text x="590" y="306" text-anchor="middle" fill="#EA4335" font-size="9" font-weight="500">next tool call</text>
+
+</svg>
