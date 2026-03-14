@@ -29,7 +29,10 @@ function playLoop(name: string, volume = 0.3): () => void {
 }
 
 export function playWake() { play("wake", 0.4); }
-export function playConnect() { play("connect", 0.4); }
+export function playConnect() {
+  const variant = Math.floor(Math.random() * 3) + 1;
+  play("connect_" + variant, 0.4);
+}
 export function playDisconnect() { play("disconnect", 0.35); }
 export function playToolStart() { play("tool_start", 0.25); }
 export function playToolEnd() { play("tool_end", 0.25); }
@@ -44,7 +47,13 @@ export function playTyping() { play("typing", 0.15); }
 export function playScroll() { play("scroll", 0.15); }
 export function playSuccess() { play("success", 0.3); }
 export function startThinking(): () => void { return playLoop("thinking", 0.12); }
+let lastPersonaAudio: HTMLAudioElement | null = null;
+
 export function playPersona(id: string) {
+  if (lastPersonaAudio) {
+    lastPersonaAudio.pause();
+    lastPersonaAudio.currentTime = 0;
+  }
   const name = `persona_${id}`;
   try {
     if (!cache[name]) {
@@ -54,5 +63,6 @@ export function playPersona(id: string) {
     audio.volume = 0.5;
     audio.currentTime = 0;
     audio.play().catch(() => {});
+    lastPersonaAudio = audio;
   } catch {}
 }

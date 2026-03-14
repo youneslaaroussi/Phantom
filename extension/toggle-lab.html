@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Vision/Audio Toggle Effects Lab</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Google Sans', system-ui, sans-serif; height: 100vh; overflow: hidden; }
+  .fake-page { width: 100%; height: 100%; background: #f8f9fa; display: flex; flex-direction: column; }
+  .fake-nav { height: 56px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; padding: 0 24px; gap: 16px; }
+  .fake-nav .logo { font-size: 20px; font-weight: 600; color: #4285F4; }
+  .fake-nav .search { flex: 1; max-width: 600px; height: 40px; border-radius: 24px; background: #f1f3f4; border: 1px solid #dfe1e5; padding: 0 16px; font-size: 14px; outline: none; }
+  .fake-content { flex: 1; padding: 32px; max-width: 900px; margin: 0 auto; }
+  .fake-card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px; border: 1px solid #e0e0e0; }
+  .fake-card h2 { font-size: 18px; color: #1f1f1f; margin-bottom: 8px; }
+  .fake-card p { font-size: 14px; color: #5f6368; line-height: 1.6; }
+  .fake-card .bar { height: 12px; background: #e8eaed; border-radius: 6px; margin: 8px 0; }
+  .fake-card .bar.short { width: 60%; }
+  .fake-card .bar.med { width: 80%; }
+  .controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 2147483647; flex-wrap: wrap; justify-content: center; max-width: 90vw; }
+  .controls button { padding: 10px 18px; border-radius: 100px; border: none; cursor: pointer; font-family: 'Google Sans', system-ui, sans-serif; font-size: 12px; font-weight: 500; }
+  .lbl { padding: 8px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; }
+  .bv { background: #4285F4; color: #fff; }
+  .ba { background: #9334E9; color: #fff; }
+  .br { background: #fff; color: #444; border: 1px solid #ddd; }
+</style>
+</head>
+<body>
+<div class="fake-page">
+  <div class="fake-nav"><span class="logo">Google</span><input class="search" placeholder="Search..." /></div>
+  <div class="fake-content">
+    <div class="fake-card"><h2>Getting started with Phantom</h2><p>Phantom is a voice-powered AI agent that lives in Chrome.</p><div class="bar med"></div><div class="bar short"></div></div>
+    <div class="fake-card"><h2>Features</h2><p>Voice & text chat, screen vision, automation, memory.</p><div class="bar"></div><div class="bar med"></div></div>
+    <div class="fake-card"><h2>How it works</h2><p>Install, add API key, pick persona, start talking.</p><div class="bar short"></div><div class="bar med"></div></div>
+  </div>
+</div>
+<div class="controls">
+  <span class="lbl">VISION</span>
+  <button class="bv" onclick="visionScan()">V1: Scan</button>
+  <button class="bv" onclick="visionIris()">V2: Iris</button>
+  <button class="bv" onclick="visionGrid()">V3: Grid</button>
+  <span class="lbl">AUDIO</span>
+  <button class="ba" onclick="audioWave()">A1: Wave</button>
+  <button class="ba" onclick="audioPulse()">A2: Pulse</button>
+  <button class="ba" onclick="audioEQ()">A3: EQ Bars</button>
+  <button class="br" onclick="reset()">Reset</button>
+</div>
+<script>
+function reset(){var e=document.getElementById("ph-fx");if(e)e.remove();}
+function mkO(){reset();var o=document.createElement("div");o.id="ph-fx";o.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483640;pointer-events:none;overflow:hidden;";document.body.appendChild(o);return o;}
+function mkGL(o){var c=document.createElement("canvas");c.style.cssText="position:absolute;top:0;left:0;width:100%;height:100%;";o.appendChild(c);var gl=c.getContext("webgl",{alpha:true,premultipliedAlpha:false});if(!gl)return null;var d=Math.min(devicePixelRatio||1,2);c.width=c.offsetWidth*d;c.height=c.offsetHeight*d;gl.viewport(0,0,c.width,c.height);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);return{gl:gl,canvas:c};}
+function bp(gl,f){var v=gl.createShader(gl.VERTEX_SHADER);gl.shaderSource(v,"attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}");gl.compileShader(v);var s=gl.createShader(gl.FRAGMENT_SHADER);gl.shaderSource(s,f);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));var pr=gl.createProgram();gl.attachShader(pr,v);gl.attachShader(pr,s);gl.linkProgram(pr);gl.useProgram(pr);var b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);var l=gl.getAttribLocation(pr,"p");gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,2,gl.FLOAT,false,0,0);return pr;}
+function anim(gl,c,pr,dur,o){var uT=gl.getUniformLocation(pr,"u_t"),uR=gl.getUniformLocation(pr,"u_r"),s=performance.now();(function f(n){var t=Math.min((n-s)/dur,1);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.uniform1f(uT,t);gl.uniform2f(uR,c.width,c.height);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);if(t<1)requestAnimationFrame(f);else setTimeout(function(){o.remove();},100);})(performance.now());}
+
+// ─── VISION V1: Scanner beam sweeps top→bottom ───
+function visionScan(){
+  var o=mkO(),r=mkGL(o);if(!r){o.remove();return;}
+  var pr=bp(r.gl,[
+    "precision mediump float;",
+    "uniform float u_t;uniform vec2 u_r;",
+    "void main(){",
+    "  vec2 uv=gl_FragCoord.xy/u_r;float y=1.0-uv.y;",
+    "  float et=u_t*u_t*(3.0-2.0*u_t);",
+    "  float front=et*1.3-0.1;",
+    "  float beam=smoothstep(0.02,0.0,abs(y-front))*0.9;",
+    "  float trail=smoothstep(front,front-0.3,y)*smoothstep(0.0,front-0.01,y)*0.15;",
+    "  float sl=abs(sin(y*u_r.y*0.5))*trail*0.3;",
+    "  float a=beam+trail+sl;",
+    "  a*=1.0-smoothstep(0.8,1.0,u_t);",
+    "  vec3 col=vec3(0.26,0.52,0.96)+vec3(0.4,0.9,1.0)*beam;",
+    "  gl_FragColor=vec4(col,clamp(a,0.0,0.9));",
+    "}"
+  ].join("\n"));
+  anim(r.gl,r.canvas,pr,1200,o);
+}
+
+// ─── VISION V2: Iris aperture opens like an eye ───
+function visionIris(){
+  var o=mkO(),r=mkGL(o);if(!r){o.remove();return;}
+  var pr=bp(r.gl,[
+    "precision mediump float;",
+    "uniform float u_t;uniform vec2 u_r;",
+    "#define PI 3.14159265",
+    "void main(){",
+    "  vec2 uv=gl_FragCoord.xy/u_r;float a2=u_r.x/u_r.y;",
+    "  vec2 pos=(uv-0.5)*vec2(a2,1.0);",
+    "  float dist=length(pos);float ang=atan(pos.y,pos.x);",
+    "  float et=u_t<0.5?2.0*u_t*u_t:1.0-pow(-2.0*u_t+2.0,2.0)/2.0;",
+    "  float blade=cos(ang*6.0+PI*0.25)*0.15+0.85;",
+    "  float rad=et*1.5*blade;",
+    "  float ring=smoothstep(rad-0.03,rad,dist)*smoothstep(rad+0.06,rad+0.01,dist);",
+    "  float fill=smoothstep(rad,rad-0.02,dist)*(1.0-et);",
+    "  vec3 col=mix(vec3(0.26,0.52,0.96),vec3(0.4,0.91,0.98),ring)*ring*2.0;",
+    "  float al=ring*0.8+fill*0.5;",
+    "  al*=1.0-smoothstep(0.75,1.0,u_t);",
+    "  gl_FragColor=vec4(col,clamp(al,0.0,0.85));",
+    "}"
+  ].join("\n"));
+  anim(r.gl,r.canvas,pr,1400,o);
+}
+
+// ─── VISION V3: HUD grid expands from center ───
+function visionGrid(){
+  var o=mkO(),r=mkGL(o);if(!r){o.remove();return;}
+  var pr=bp(r.gl,[
+    "precision mediump float;",
+    "uniform float u_t;uniform vec2 u_r;",
+    "void main(){",
+    "  vec2 uv=gl_FragCoord.xy/u_r;",
+    "  float et=u_t<0.3?u_t/0.3:1.0;",
+    "  float fo=1.0-smoothstep(0.5,1.0,u_t);",
+    "  float gx=abs(sin(uv.x*u_r.x*0.05));",
+    "  float gy=abs(sin(uv.y*u_r.y*0.05));",
+    "  float grid=smoothstep(0.97,1.0,1.0-min(gx,gy));",
+    "  float ex=step(0.5-et*0.5,uv.x)*step(uv.x,0.5+et*0.5);",
+    "  float ey=step(0.5-et*0.5,uv.y)*step(uv.y,0.5+et*0.5);",
+    "  grid*=ex*ey;",
+    "  float ch=smoothstep(0.003,0.0,abs(uv.y-0.5))*0.4;",
+    "  float cv=smoothstep(0.003,0.0,abs(uv.x-0.5))*0.4;",
+    "  float cn=0.0;",
+    "  for(int i=0;i<4;i++){",
+    "    vec2 c=vec2(mod(float(i),2.0),floor(float(i)/2.0));",
+    "    vec2 cp=mix(vec2(0.5),c,et);",
+    "    cn+=smoothstep(0.015,0.01,length(uv-cp))*0.6;",
+    "  }",
+    "  float al=(grid*0.3+ch+cv+cn)*fo;",
+    "  gl_FragColor=vec4(vec3(0.26,0.52,0.96),clamp(al,0.0,0.8));",
+    "}"
+  ].join("\n"));
+  anim(r.gl,r.canvas,pr,1600,o);
+}
+
+// ─── AUDIO A1: Sound wave ripples expand from center horizontally ───
+function audioWave(){
+  var o=mkO(),r=mkGL(o);if(!r){o.remove();return;}
+  var pr=bp(r.gl,[
+    "precision mediump float;",
+    "uniform float u_t;uniform vec2 u_r;",
+    "void main(){",
+    "  vec2 uv=gl_FragCoord.xy/u_r;",
+    "  float x=uv.x-0.5;float y=uv.y-0.5;",
+    "  float et=u_t*u_t*(3.0-2.0*u_t);",
+    "  float al=0.0;vec3 col=vec3(0.0);",
+    "  vec3 purple=vec3(0.58,0.2,0.91);",
+    "  vec3 pink=vec3(0.89,0.32,0.67);",
+    "  for(int i=0;i<5;i++){",
+    "    float fi=float(i);",
+    "    float delay=fi*0.06;",
+    "    float lT=clamp((u_t-delay)/(1.0-delay),0.0,1.0);",
+    "    float lE=lT*lT*(3.0-2.0*lT);",
+    "    float waveX=lE*1.2;",
+    "    float distL=abs(abs(x)-waveX);",
+    "    float thick=0.008+0.005*(1.0-lE);",
+    "    float wave=smoothstep(thick,thick*0.2,distL);",
+    "    float yWarp=sin(y*20.0+fi*2.0-u_t*8.0)*0.02*lE;",
+    "    float distW=abs(abs(x+yWarp)-waveX);",
+    "    wave=max(wave,smoothstep(thick*1.5,thick*0.3,distW)*0.7);",
+    "    float fade=(1.0-lE)*(1.0-smoothstep(0.7,1.0,lT));",
+    "    wave*=fade;",
+    "    wave+=exp(-distL*30.0)*0.2*fade;",
+    "    col+=mix(purple,pink,fi/4.0)*wave;",
+    "    al+=wave;",
+    "  }",
+    "  float cg=exp(-x*x*40.0-y*y*10.0)*(1.0-et)*0.3;",
+    "  col+=purple*cg;al+=cg;",
+    "  al*=1.0-smoothstep(0.7,1.0,u_t);",
+    "  gl_FragColor=vec4(col,clamp(al,0.0,0.85));",
+    "}"
+  ].join("\n"));
+  anim(r.gl,r.canvas,pr,1300,o);
+}
+
+// ─── AUDIO A2: Bass pulse — concentric rings + screen shake ───
+function audioPulse(){
+  var o=mkO(),r=mkGL(o);if(!r){o.remove();return;}
+  var pr=bp(r.gl,[
+    "precision mediump float;",
+    "uniform float u_t;uniform vec2 u_r;",
+    "void main(){",
+    "  vec2 uv=gl_FragCoord.xy/u_r;",
+    "  float a2=u_r.x/u_r.y;",
+    "  vec2 pos=(uv-0.5)*vec2(a2,1.0);",
+    "  float dist=length(pos);",
+    "  float al=0.0;vec3 col=vec3(0.0);",
+    "  vec3 purple=vec3(0.58,0.2,0.91);",
+    "  vec3 violet=vec3(0.4,0.15,0.8);",
+    "  for(int i=0;i<3;i++){",
+    "    float fi=float(i);",
+    "    float delay=fi*0.15;",
+    "    float lT=clamp((u_t-delay)/(0.6),0.0,1.0);",
+    "    float lE=1.0-pow(1.0-lT,3.0);",
+    "    float ringR=lE*1.5;",
+    "    float thick=0.03*(1.0-lE*0.5);",
+    "    float rd=abs(dist-ringR);",
+    "    float ring=smoothstep(thick,0.0,rd);",
+    "    ring*=(1.0-lE);",
+    "    ring+=exp(-rd*20.0)*0.4*(1.0-lE);",
+    "    col+=mix(purple,violet,fi/2.0)*ring;",
+    "    al+=ring;",
+    "  }",
+    "  float flash=exp(-dist*dist*8.0)*pow(max(1.0-u_t*3.0,0.0),2.0)*0.7;",
+    "  col+=vec3(1.0,0.8,1.0)*flash;al+=flash;",
+    "  al*=1.0-smoothstep(0.7,1.0,u_t);",
+    "  gl_FragColor=vec4(col,clamp(al,0.0,0.9));",
+    "}"
+  ].join("\n"));
+  // Screen shake
+  var shakes=[0,0,0];
+  var page=document.querySelector('.fake-page');
+  var sStart=performance.now();
+  (function sk(){
+    var t=(performance.now()-sStart)/800;
+    if(t>1){page.style.transform='';return;}
+    var intensity=(1.0-t)*4;
+    var sx=(Math.random()-0.5)*intensity;
+    var sy=(Math.random()-0.5)*intensity;
+    page.style.transform='translate('+sx+'px,'+sy+'px)';
+    requestAnimationFrame(sk);
+  })();
+  anim(r.gl,r.canvas,pr,1200,o);
+}
+
+// ─── AUDIO A3: EQ frequency bars rise from bottom ───
+function audioEQ(){
+  var o=mkO();
+  var style=document.createElement("style");
+  style.textContent="@keyframes eqUp{0%{transform:scaleY(0)}30%{transform:scaleY(var(--h))}60%{transform:scaleY(calc(var(--h)*0.6))}80%{transform:scaleY(calc(var(--h)*0.3))}100%{transform:scaleY(0)}}";
+  o.appendChild(style);
+  var colors=["#7C3AED","#8B5CF6","#A78BFA","#C084FC","#9334E9","#6D28D9","#7C3AED","#8B5CF6"];
+  var W=window.innerWidth;
+  var count=Math.floor(W/12);
+  for(var i=0;i<count;i++){
+    var bar=document.createElement("div");
+    var h=0.3+Math.random()*0.7;
+    var delay=Math.abs(i-count/2)*8+Math.random()*100;
+    var dur=600+Math.random()*400;
+    var c=colors[i%colors.length];
+    bar.style.cssText="position:absolute;bottom:0;left:"+(i*12)+"px;width:8px;height:100%;background:"+c+";transform-origin:bottom;transform:scaleY(0);--h:"+h+";animation:eqUp "+dur+"ms "+delay+"ms ease-out forwards;border-radius:4px 4px 0 0;opacity:0.7;";
+    o.appendChild(bar);
+  }
+  setTimeout(function(){o.remove();},1800);
+}
+
+function reset(){var e=document.getElementById("ph-fx");if(e)e.remove();}
+</script>
+</body>
+</html>

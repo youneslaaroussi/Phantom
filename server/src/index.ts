@@ -91,6 +91,14 @@ app.get("/blog", (c) => {
   return c.redirect("/blog.html");
 });
 
+app.get("/privacy", (c) => {
+  return c.redirect("/privacy.html");
+});
+
+app.get("/terms", (c) => {
+  return c.redirect("/terms.html");
+});
+
 app.use("/*", serveStatic({ root: "./public" }));
 
 const port = parseInt(process.env.PORT || "8080");

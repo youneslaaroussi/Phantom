@@ -60,6 +60,13 @@ export function getCurrentSession(): SessionTrace | null {
   return currentSession;
 }
 
+export function clearCurrentSession(): void {
+  if (currentSession) {
+    currentSession.entries = [];
+  }
+  notify();
+}
+
 export function onTraceUpdate(fn: () => void): () => void {
   listeners.push(fn);
   return () => { listeners = listeners.filter((l) => l !== fn); };
@@ -86,7 +93,10 @@ export async function getSavedSessions(): Promise<SessionTrace[]> {
 
 export async function clearSavedSessions(): Promise<void> {
   return new Promise((resolve) => {
-    chrome.storage.local.remove(TRACE_STORAGE_KEY, resolve);
+    chrome.storage.local.set({ [TRACE_STORAGE_KEY]: [] }, () => {
+      notify();
+      resolve();
+    });
   });
 }
 

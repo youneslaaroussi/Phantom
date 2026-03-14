@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Phantom</title>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Text:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --blue: #4285F4; --blue-bg: #e8f0fe; --surface: #ffffff; --surface-dim: #f8f9fa;
+      --on-surface: #1f1f1f; --on-surface-variant: #444746; --outline: #747775; --outline-variant: #c4c7c5;
+      --font: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
+      --font-text: 'Google Sans Text', 'Google Sans', 'Segoe UI', system-ui, sans-serif;
+      --max-w: 720px;
+    }
+    body { font-family: var(--font-text); color: var(--on-surface); background: var(--surface); -webkit-font-smoothing: antialiased; line-height: 1.7; }
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; height: 64px; background: rgba(255,255,255,0.85); backdrop-filter: blur(20px) saturate(1.5); border-bottom: 1px solid var(--outline-variant); }
+    .nav-inner { max-width: 1080px; margin: 0 auto; width: 100%; height: 100%; display: flex; align-items: center; padding: 0 24px; }
+    .logo { display: flex; align-items: center; gap: 10px; font-family: var(--font); font-weight: 500; font-size: 18px; color: var(--on-surface); text-decoration: none; }
+    .logo img { width: 40px; height: 40px; border-radius: 10px; }
+    .content { max-width: var(--max-w); margin: 0 auto; padding: 100px 24px 80px; }
+    h1 { font-family: var(--font); font-size: 36px; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { font-size: 14px; color: var(--outline); margin-bottom: 40px; }
+    h2 { font-family: var(--font); font-size: 20px; font-weight: 600; margin: 32px 0 12px; }
+    p, li { font-size: 15px; color: var(--on-surface-variant); margin-bottom: 12px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 8px; }
+    footer { padding: 32px 24px; border-top: 1px solid var(--outline-variant); text-align: center; font-size: 13px; color: var(--outline); }
+    footer a { color: var(--on-surface-variant); text-decoration: none; }
+    footer a:hover { color: var(--blue); }
+  </style>
+</head>
+<body>
+  <nav><div class="nav-inner"><a href="/" class="logo"><img src="/mascot.png" alt="Phantom" /> Phantom</a></div></nav>
+  <div class="content">
+    <h1>Privacy Policy</h1>
+    <p class="subtitle">Last updated: March 14, 2026</p>
+
+    <h2>Overview</h2>
+    <p>Phantom is a voice-powered AI browser assistant built as an open-source Chrome extension. Your privacy is a core design principle, not an afterthought.</p>
+
+    <h2>Data We Collect</h2>
+    <p>Phantom collects <strong>no personal data</strong>. Specifically:</p>
+    <ul>
+      <li>No accounts or sign-ups required</li>
+      <li>No analytics, tracking, or telemetry</li>
+      <li>No cookies on our website (except essential ones)</li>
+      <li>No user data is stored on our servers</li>
+    </ul>
+
+    <h2>How the Extension Works</h2>
+    <p>When you use Phantom, the following data flows occur:</p>
+    <ul>
+      <li><strong>Voice audio</strong> is streamed to Google's Gemini API via our WebSocket proxy for real-time conversation. Audio is not stored.</li>
+      <li><strong>Screen captures</strong> (when vision is enabled) are sent to Gemini for understanding page context. These are not stored.</li>
+      <li><strong>API keys</strong> (if using BYOK mode) are stored locally in your browser's extension storage and never sent to our servers.</li>
+      <li><strong>Memory and embeddings</strong> are computed and stored entirely in your browser using a local model. They never leave your device.</li>
+      <li><strong>Session summaries</strong> are generated via our server but stored only in your browser's local storage.</li>
+    </ul>
+
+    <h2>Privacy Shield</h2>
+    <p>Before any screenshot is sent to the AI, Phantom's Privacy Shield automatically detects and blurs sensitive content including:</p>
+    <ul>
+      <li>Passwords and credit card numbers</li>
+      <li>API keys and tokens</li>
+      <li>Social Security Numbers and personal identifiers</li>
+      <li>Email addresses and phone numbers</li>
+    </ul>
+
+    <h2>Third-Party Services</h2>
+    <p>Phantom uses the following third-party services:</p>
+    <ul>
+      <li><strong>Google Gemini API</strong> — for AI conversation and understanding. Subject to <a href="https://ai.google.dev/gemini-api/terms" style="color:var(--blue)">Google's API Terms</a>.</li>
+      <li><strong>Google Cloud Run</strong> — hosts the WebSocket proxy server. No user data is persisted.</li>
+    </ul>
+
+    <h2>Open Source</h2>
+    <p>Phantom is fully open source. You can audit every line of code on <a href="https://github.com/youneslaaroussi/Phantom" style="color:var(--blue)">GitHub</a>.</p>
+
+    <h2>Contact</h2>
+    <p>For privacy questions, reach out via <a href="https://github.com/youneslaaroussi/Phantom/issues" style="color:var(--blue)">GitHub Issues</a> or email <a href="mailto:younes@youneslaaroussi.ca" style="color:var(--blue)">younes@youneslaaroussi.ca</a>.</p>
+  </div>
+  <footer>Phantom by <a href="https://youneslaaroussi.ca">youneslaaroussi.ca</a></footer>
+</body>
+</html>

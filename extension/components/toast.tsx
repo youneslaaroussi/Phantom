@@ -56,7 +56,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div style={{ position: "fixed", bottom: 90, left: 12, right: 12, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+      <div style={{ position: "fixed", top: 64, left: 12, right: 12, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
         {toasts.map((t) => {
           const Icon = ICONS[t.type];
           const c = COLORS[t.type];
@@ -90,12 +90,12 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
       </div>
       <style>{`
         @keyframes toast-enter {
-          from { opacity: 0; transform: translateY(16px) scale(0.95); }
+          from { opacity: 0; transform: translateY(-16px) scale(0.95); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
         @keyframes toast-exit {
           from { opacity: 1; transform: translateY(0) scale(1); }
-          to { opacity: 0; transform: translateY(8px) scale(0.95); }
+          to { opacity: 0; transform: translateY(-8px) scale(0.95); }
         }
       `}</style>
     </ToastContext.Provider>

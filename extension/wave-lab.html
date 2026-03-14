@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Page Launch Effect Lab</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Google Sans', system-ui, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .fake-page {
+    width: 100%; height: 100%;
+    background: #f8f9fa;
+    display: flex; flex-direction: column;
+  }
+
+  .fake-nav {
+    height: 56px; background: #fff; border-bottom: 1px solid #e0e0e0;
+    display: flex; align-items: center; padding: 0 24px; gap: 16px;
+  }
+  .fake-nav .logo { font-size: 20px; font-weight: 600; color: #4285F4; }
+  .fake-nav .search {
+    flex: 1; max-width: 600px; height: 40px; border-radius: 24px;
+    background: #f1f3f4; border: 1px solid #dfe1e5; padding: 0 16px;
+    font-size: 14px; color: #1f1f1f; outline: none;
+  }
+
+  .fake-content {
+    flex: 1; padding: 32px; max-width: 900px; margin: 0 auto;
+  }
+  .fake-card {
+    background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px;
+    border: 1px solid #e0e0e0;
+  }
+  .fake-card h2 { font-size: 18px; color: #1f1f1f; margin-bottom: 8px; }
+  .fake-card p { font-size: 14px; color: #5f6368; line-height: 1.6; }
+  .fake-card .bar { height: 12px; background: #e8eaed; border-radius: 6px; margin: 8px 0; }
+  .fake-card .bar.short { width: 60%; }
+  .fake-card .bar.med { width: 80%; }
+
+  .controls {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 2147483647; flex-wrap: wrap; justify-content: center;
+  }
+  .controls button {
+    padding: 10px 20px; border-radius: 100px; border: none; cursor: pointer;
+    font-family: 'Google Sans', system-ui, sans-serif; font-size: 13px; font-weight: 500;
+    transition: all 0.2s;
+  }
+  .btn-1 { background: #4285F4; color: #fff; }
+  .btn-2 { background: #EA4335; color: #fff; }
+  .btn-3 { background: #FBBC05; color: #1f1f1f; }
+  .btn-4 { background: #34A853; color: #fff; }
+  .btn-5 { background: #9334E9; color: #fff; }
+  .btn-reset { background: #fff; color: #444; border: 1px solid #ddd; }
+</style>
+</head>
+<body>
+
+<div class="fake-page">
+  <div class="fake-nav">
+    <span class="logo">Google</span>
+    <input class="search" placeholder="Search..." />
+  </div>
+  <div class="fake-content">
+    <div class="fake-card">
+      <h2>Getting started with Phantom</h2>
+      <p>Phantom is a voice-powered AI agent that lives in Chrome. Ask it to click, scroll, read, summarize, and navigate — hands-free.</p>
+      <div class="bar med"></div>
+      <div class="bar short"></div>
+    </div>
+    <div class="fake-card">
+      <h2>Features</h2>
+      <p>Voice & text chat, screen vision, click/scroll/type automation, memory, content actions, and privacy shield.</p>
+      <div class="bar"></div>
+      <div class="bar med"></div>
+      <div class="bar short"></div>
+    </div>
+    <div class="fake-card">
+      <h2>How it works</h2>
+      <p>Install the extension, add your API key, pick a persona, and start talking. Phantom handles the rest.</p>
+      <div class="bar short"></div>
+      <div class="bar med"></div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn-1" onclick="playRipple()">1: Ripple</button>
+  <button class="btn-2" onclick="playVortex()">2: Vortex</button>
+  <button class="btn-3" onclick="playShatter()">3: Shatter</button>
+  <button class="btn-4" onclick="playPortal()">4: Portal</button>
+  <button class="btn-5" onclick="playSparkle()">5: Sparkle</button>
+  <button class="btn-reset" onclick="reset()">Reset</button>
+</div>
+
+<script>
+var MASCOT_URL = "assets/mascot.png";
+
+function makeOverlay() {
+  reset();
+  var overlay = document.createElement("div");
+  overlay.id = "phantom-launch-overlay";
+  overlay.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483640;pointer-events:none;overflow:hidden;";
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function makeMascot(overlay, size) {
+  var mascot = document.createElement("img");
+  mascot.src = MASCOT_URL;
+  mascot.onerror = function() { mascot.src = "https://placehold.co/160x160/e8f0fe/4285F4?text=P"; };
+  var s = size || 160;
+  mascot.style.cssText = "position:absolute;top:50%;left:50%;width:"+s+"px;height:"+s+"px;transform:translate(-50%,-50%) scale(0);opacity:0;image-rendering:pixelated;filter:drop-shadow(0 4px 24px rgba(66,133,244,0.4));";
+  overlay.appendChild(mascot);
+  return mascot;
+}
+
+function makeGL(overlay) {
+  var canvas = document.createElement("canvas");
+  canvas.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;";
+  overlay.insertBefore(canvas, overlay.firstChild);
+  var gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: false });
+  if (!gl) return null;
+  var dpr = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  return { gl: gl, canvas: canvas };
+}
+
+function buildProg(gl, fragSrc) {
+  var vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, "attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}");
+  gl.compileShader(vs);
+  var fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, fragSrc);
+  gl.compileShader(fs);
+  if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(fs));
+  var prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+  var loc = gl.getAttribLocation(prog, "p");
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  return prog;
+}
+
+function popMascot(mascot, delay) {
+  setTimeout(function() {
+    mascot.style.transition = "transform 0.6s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease-out";
+    mascot.style.transform = "translate(-50%,-50%) scale(1)";
+    mascot.style.opacity = "1";
+  }, delay || 0);
+}
+
+function fadeMascot(mascot, overlay, delay) {
+  setTimeout(function() {
+    mascot.style.transition = "transform 0.5s ease-in, opacity 0.4s ease-in";
+    mascot.style.transform = "translate(-50%,-50%) scale(0.6)";
+    mascot.style.opacity = "0";
+  }, delay || 0);
+  setTimeout(function() { overlay.remove(); }, (delay || 0) + 600);
+}
+
+// ═══════════════════════════════════════════
+// 1. RIPPLE — Google-colored concentric rings
+// ═══════════════════════════════════════════
+function playRipple() {
+  var overlay = makeOverlay();
+  var mascot = makeMascot(overlay);
+  var r = makeGL(overlay);
+  if (!r) { overlay.remove(); return; }
+  var gl = r.gl, canvas = r.canvas;
+
+  var prog = buildProg(gl, [
+    "precision mediump float;",
+    "uniform float u_t;",
+    "uniform vec2 u_r;",
+    "void main(){",
+    "  vec2 uv=gl_FragCoord.xy/u_r;",
+    "  float aspect=u_r.x/u_r.y;",
+    "  vec2 pos=(uv-0.5)*vec2(aspect,1.0);",
+    "  float dist=length(pos);",
+    "  float maxR=1.2;",
+    "  float alpha=0.0;vec3 col=vec3(0.0);",
+    "  vec3 colors[4];",
+    "  colors[0]=vec3(0.26,0.52,0.96);",
+    "  colors[1]=vec3(0.92,0.26,0.21);",
+    "  colors[2]=vec3(0.98,0.74,0.02);",
+    "  colors[3]=vec3(0.20,0.66,0.33);",
+    "  for(int i=0;i<4;i++){",
+    "    float fi=float(i);",
+    "    float delay=fi*0.08;",
+    "    float lT=clamp((u_t-delay)/(1.0-delay),0.0,1.0);",
+    "    float lE=lT*lT*(3.0-2.0*lT);",
+    "    float ringR=lE*maxR;",
+    "    float thick=0.012+0.008*(1.0-lE);",
+    "    float rd=abs(dist-ringR);",
+    "    float ring=smoothstep(thick,thick*0.2,rd);",
+    "    float fade=(1.0-lE)*(1.0-smoothstep(0.7,1.0,lT));",
+    "    ring*=fade;",
+    "    ring+=exp(-rd*40.0)*0.3*fade;",
+    "    ring*=sin(dist*80.0-u_t*12.0+fi*1.5)*0.1+0.9;",
+    "    col+=colors[i]*ring;alpha+=ring;",
+    "  }",
+    "  col+=vec3(0.26,0.52,0.96)*exp(-dist*dist*20.0)*(1.0-u_t*u_t*(3.0-2.0*u_t))*0.4;",
+    "  alpha+=exp(-dist*dist*20.0)*(1.0-u_t*u_t*(3.0-2.0*u_t))*0.4;",
+    "  alpha*=1.0-smoothstep(0.65,1.0,u_t);",
+    "  gl_FragColor=vec4(col,clamp(alpha,0.0,0.85));",
+    "}"
+  ].join("\n"));
+
+  var uT = gl.getUniformLocation(prog, "u_t");
+  var uR = gl.getUniformLocation(prog, "u_r");
+  var start = performance.now(), DUR = 1400, shown = false;
+  popMascot(mascot, 280);
+  function frame(now) {
+    var t = Math.min((now - start) / DUR, 1);
+    gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniform1f(uT, t); gl.uniform2f(uR, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (t < 1) requestAnimationFrame(frame);
+    else fadeMascot(mascot, overlay, 400);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════
+// 2. VORTEX — Spinning spiral arms that sweep in
+// ═══════════════════════════════════════════
+function playVortex() {
+  var overlay = makeOverlay();
+  var mascot = makeMascot(overlay);
+  var r = makeGL(overlay);
+  if (!r) { overlay.remove(); return; }
+  var gl = r.gl, canvas = r.canvas;
+
+  var prog = buildProg(gl, [
+    "precision mediump float;",
+    "uniform float u_t;",
+    "uniform vec2 u_r;",
+    "#define PI 3.14159265",
+    "void main(){",
+    "  vec2 uv=gl_FragCoord.xy/u_r;",
+    "  float aspect=u_r.x/u_r.y;",
+    "  vec2 pos=(uv-0.5)*vec2(aspect,1.0);",
+    "  float dist=length(pos);",
+    "  float angle=atan(pos.y,pos.x);",
+    "",
+    "  float et=u_t*u_t*(3.0-2.0*u_t);",
+    "  float spin=et*PI*3.0;",
+    "",
+    "  vec3 blue=vec3(0.26,0.52,0.96);",
+    "  vec3 red=vec3(0.92,0.26,0.21);",
+    "  vec3 yellow=vec3(0.98,0.74,0.02);",
+    "  vec3 green=vec3(0.20,0.66,0.33);",
+    "",
+    "  float alpha=0.0;vec3 col=vec3(0.0);",
+    "",
+    "  for(int i=0;i<4;i++){",
+    "    float fi=float(i);",
+    "    float armAngle=angle-spin+fi*PI*0.5;",
+    "    float spiral=fract(armAngle/(2.0*PI)+dist*2.0-et*0.5);",
+    "    float arm=smoothstep(0.08,0.0,abs(spiral-0.5)-0.15);",
+    "    float radialFade=smoothstep(0.0,0.1,dist)*smoothstep(et*1.5,et*0.3,dist);",
+    "    arm*=radialFade;",
+    "    arm*=1.0-smoothstep(0.6,1.0,u_t);",
+    "    vec3 c=(i==0)?blue:(i==1)?red:(i==2)?yellow:green;",
+    "    col+=c*arm;alpha+=arm;",
+    "  }",
+    "",
+    "  float core=exp(-dist*dist*30.0)*et*(1.0-smoothstep(0.5,1.0,u_t))*0.6;",
+    "  col+=vec3(1.0)*core;alpha+=core;",
+    "",
+    "  alpha*=1.0-smoothstep(0.7,1.0,u_t);",
+    "  gl_FragColor=vec4(col,clamp(alpha,0.0,0.8));",
+    "}"
+  ].join("\n"));
+
+  var uT = gl.getUniformLocation(prog, "u_t");
+  var uR = gl.getUniformLocation(prog, "u_r");
+  var start = performance.now(), DUR = 1600;
+  popMascot(mascot, 300);
+  function frame(now) {
+    var t = Math.min((now - start) / DUR, 1);
+    gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniform1f(uT, t); gl.uniform2f(uR, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (t < 1) requestAnimationFrame(frame);
+    else fadeMascot(mascot, overlay, 400);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════
+// 3. SHATTER — Glass pane cracks from center
+//    CSS-based with random polygon fragments
+// ═══════════════════════════════════════════
+function playShatter() {
+  var overlay = makeOverlay();
+  var mascot = makeMascot(overlay);
+
+  var style = document.createElement("style");
+  style.textContent = "@keyframes phShard{0%{transform:translate(0,0) rotate(0deg) scale(1);opacity:0.7}100%{transform:translate(var(--tx),var(--ty)) rotate(var(--rot)) scale(0.3);opacity:0}}@keyframes phCrackFlash{0%{opacity:0.25}100%{opacity:0}}";
+  overlay.appendChild(style);
+
+  var flash = document.createElement("div");
+  flash.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;background:white;animation:phCrackFlash 0.3s ease-out forwards;";
+  overlay.appendChild(flash);
+
+  var cx = window.innerWidth / 2;
+  var cy = window.innerHeight / 2;
+  var colors = ["#4285F4","#EA4335","#FBBC05","#34A853"];
+
+  for (var i = 0; i < 40; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var dist = 50 + Math.random() * Math.max(window.innerWidth, window.innerHeight) * 0.6;
+    var tx = Math.cos(angle) * dist;
+    var ty = Math.sin(angle) * dist;
+    var rot = (Math.random() - 0.5) * 720;
+    var w = 20 + Math.random() * 60;
+    var h = 20 + Math.random() * 60;
+    var delay = Math.random() * 200;
+    var dur = 800 + Math.random() * 600;
+    var color = colors[i % 4];
+    var x = cx - w/2 + (Math.random() - 0.5) * 100;
+    var y = cy - h/2 + (Math.random() - 0.5) * 100;
+    var clip = "polygon(" +
+      (Math.random()*30) + "% " + (Math.random()*30) + "%," +
+      (70+Math.random()*30) + "% " + (Math.random()*30) + "%," +
+      (70+Math.random()*30) + "% " + (70+Math.random()*30) + "%," +
+      (Math.random()*30) + "% " + (70+Math.random()*30) + "%)";
+
+    var shard = document.createElement("div");
+    shard.style.cssText = "position:absolute;left:"+x+"px;top:"+y+"px;width:"+w+"px;height:"+h+"px;background:"+color+";clip-path:"+clip+";opacity:0.7;--tx:"+tx+"px;--ty:"+ty+"px;--rot:"+rot+"deg;animation:phShard "+dur+"ms "+delay+"ms cubic-bezier(0.25,0.46,0.45,0.94) forwards;";
+    overlay.appendChild(shard);
+  }
+
+  popMascot(mascot, 150);
+  setTimeout(function() { fadeMascot(mascot, overlay, 0); }, 1200);
+}
+
+// ═══════════════════════════════════════════
+// 4. PORTAL — Wormhole tunnel zoom effect
+// ═══════════════════════════════════════════
+function playPortal() {
+  var overlay = makeOverlay();
+  var mascot = makeMascot(overlay);
+  var r = makeGL(overlay);
+  if (!r) { overlay.remove(); return; }
+  var gl = r.gl, canvas = r.canvas;
+
+  var prog = buildProg(gl, [
+    "precision mediump float;",
+    "uniform float u_t;",
+    "uniform vec2 u_r;",
+    "#define PI 3.14159265",
+    "void main(){",
+    "  vec2 uv=gl_FragCoord.xy/u_r;",
+    "  float aspect=u_r.x/u_r.y;",
+    "  vec2 pos=(uv-0.5)*vec2(aspect,1.0);",
+    "  float dist=length(pos);",
+    "  float angle=atan(pos.y,pos.x);",
+    "",
+    "  float et=u_t<0.5?2.0*u_t*u_t:1.0-pow(-2.0*u_t+2.0,2.0)/2.0;",
+    "",
+    "  vec3 blue=vec3(0.26,0.52,0.96);",
+    "  vec3 red=vec3(0.92,0.26,0.21);",
+    "  vec3 yellow=vec3(0.98,0.74,0.02);",
+    "  vec3 green=vec3(0.20,0.66,0.33);",
+    "",
+    "  float tunnel=fract(dist*6.0-et*4.0);",
+    "  float rings=smoothstep(0.4,0.5,tunnel)*smoothstep(0.6,0.5,tunnel);",
+    "  rings*=smoothstep(0.0,0.15,dist);",
+    "",
+    "  float sector=angle/PI*2.0;",
+    "  float quadrant=floor(mod(sector+4.0,4.0));",
+    "  vec3 col=(quadrant<1.0)?blue:(quadrant<2.0)?red:(quadrant<3.0)?yellow:green;",
+    "",
+    "  float warp=smoothstep(1.0,0.0,dist/(0.8+et*0.5));",
+    "  rings*=warp;",
+    "",
+    "  float glow=exp(-dist*dist*8.0)*et*0.5;",
+    "  col=col*rings+vec3(1.0)*glow;",
+    "  float alpha=rings*0.7+glow;",
+    "",
+    "  alpha*=1.0-smoothstep(0.7,1.0,u_t);",
+    "  gl_FragColor=vec4(col,clamp(alpha,0.0,0.85));",
+    "}"
+  ].join("\n"));
+
+  var uT = gl.getUniformLocation(prog, "u_t");
+  var uR = gl.getUniformLocation(prog, "u_r");
+  var start = performance.now(), DUR = 1800;
+  popMascot(mascot, 350);
+  function frame(now) {
+    var t = Math.min((now - start) / DUR, 1);
+    gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniform1f(uT, t); gl.uniform2f(uR, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (t < 1) requestAnimationFrame(frame);
+    else fadeMascot(mascot, overlay, 400);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════
+// 5. SPARKLE — Enhanced particle burst
+// ═══════════════════════════════════════════
+function playSparkle() {
+  var overlay = makeOverlay();
+  overlay.id = "phantom-sparkle-overlay";
+  var mascot = makeMascot(overlay);
+
+  var style = document.createElement("style");
+  style.textContent = "@keyframes phSpk2{0%{transform:translate(0,0) scale(1);opacity:1}60%{opacity:0.6}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0}}@keyframes phRing{0%{transform:translate(-50%,-50%) scale(0);opacity:0.6;border-width:3px}100%{transform:translate(-50%,-50%) scale(1);opacity:0;border-width:1px}}";
+  overlay.appendChild(style);
+
+  var cx = window.innerWidth / 2;
+  var cy = window.innerHeight / 2;
+  var colors = ["#4285F4","#EA4335","#FBBC05","#34A853"];
+
+  for (var r = 0; r < 3; r++) {
+    var ring = document.createElement("div");
+    var ringSize = 200 + r * 200;
+    ring.style.cssText = "position:absolute;left:"+cx+"px;top:"+cy+"px;width:"+ringSize+"px;height:"+ringSize+"px;border-radius:50%;border:3px solid "+colors[r]+";opacity:0;animation:phRing 0.8s "+(r*150)+"ms ease-out forwards;";
+    overlay.appendChild(ring);
+  }
+
+  for (var i = 0; i < 60; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var dist = 100 + Math.random() * Math.max(window.innerWidth, window.innerHeight) * 0.4;
+    var dx = Math.cos(angle) * dist;
+    var dy = Math.sin(angle) * dist;
+    var size = 2 + Math.random() * 5;
+    var delay = Math.random() * 300;
+    var dur = 700 + Math.random() * 500;
+    var color = colors[i % 4];
+
+    var spark = document.createElement("div");
+    spark.style.cssText = "position:absolute;left:"+cx+"px;top:"+cy+"px;width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+color+";box-shadow:0 0 "+(size*4)+"px "+color+";--dx:"+dx+"px;--dy:"+dy+"px;animation:phSpk2 "+dur+"ms "+delay+"ms ease-out forwards;";
+    overlay.appendChild(spark);
+  }
+
+  popMascot(mascot, 100);
+  setTimeout(function() { fadeMascot(mascot, overlay, 0); }, 1200);
+}
+
+function reset() {
+  var el = document.getElementById("phantom-launch-overlay");
+  if (el) el.remove();
+  el = document.getElementById("phantom-sparkle-overlay");
+  if (el) el.remove();
+}
+</script>
+</body>
+</html>

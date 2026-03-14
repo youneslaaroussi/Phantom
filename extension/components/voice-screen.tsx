@@ -251,7 +251,7 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
         </div>
       )}
 
-      <div className="relative z-20 px-3 py-3" style={{ borderTop: "1px solid var(--g-outline-variant)" }}>
+      <div className="relative z-20 px-3 py-3">
         <form onSubmit={handleTextSubmit} className="flex gap-2 items-center">
           <input
             type="text"

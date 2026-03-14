@@ -77,7 +77,7 @@ async function processWithAI(
   action: ContentActionType,
   instruction?: string
 ): Promise<string> {
-  const serverUrl = await getServerUrl();
+  const serverUrl = (await getServerUrl()).replace(/^wss:/, "https:").replace(/^ws:/, "http:");
   const response = await fetch(
     `${serverUrl.replace(/\/$/, "")}/api/content-action`,
     {

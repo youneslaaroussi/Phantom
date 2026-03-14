@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Copy, Trash2, ChevronDown, ChevronRight, Terminal, User, Bot, Wrench, Eye, AlertCircle, Info } from "lucide-react";
-import { getCurrentSession, getSavedSessions, clearSavedSessions, onTraceUpdate, formatTraceAsText, type SessionTrace, type TraceEntry, type TraceEntryType } from "../lib/trace";
+import { getCurrentSession, getSavedSessions, clearSavedSessions, clearCurrentSession, onTraceUpdate, formatTraceAsText, type SessionTrace, type TraceEntry, type TraceEntryType } from "../lib/trace";
 import { MarkdownText } from "./markdown";
 
 interface TraceViewerProps {
@@ -60,8 +60,8 @@ export const TraceViewer = ({ onBack }: TraceViewerProps) => {
 
   const handleClear = async () => {
     await clearSavedSessions();
-    const current = getCurrentSession();
-    setSessions(current ? [current] : []);
+    clearCurrentSession();
+    setSessions([]);
     setActiveIdx(0);
   };
 
@@ -145,7 +145,7 @@ const TraceEntryRow = ({ entry, baseTime }: { entry: TraceEntry; baseTime: numbe
           <Icon className="w-3 h-3" style={{ color: cfg.color }} />
         </div>
         <span className="text-xs font-google-text flex-1 truncate" style={{ color: cfg.color }}>
-          {entry.type === "tool_call" ? entry.content : entry.content.slice(0, 120)}
+          {entry.type === "tool_call" ? entry.content : entry.type === "agent_text" ? "Response" : entry.content.slice(0, 120)}
         </span>
         {(hasMeta || entry.content.length > 120) && (
           expanded

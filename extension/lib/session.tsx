@@ -29,7 +29,7 @@ import { playConnect, playDisconnect, playToolStart, playToolEnd, playError, pla
 import { getSavedPersonaId, savePersonaId, getPersona, type Persona } from "./personas";
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
 import { buildMemoryContext, summarizeSession } from "./memory/index";
-import { playPageLaunchEffect, playPageSparkleEffect } from "./page-effects";
+import { playPageLaunchEffect, playPageVisionEffect, playPageAudioEffect } from "./page-effects";
 
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 
@@ -42,9 +42,9 @@ Guidelines:
 - Don't read long text aloud — summarize it instead
 - Keep responses SHORT — the user is listening, not reading. 1-2 sentences max unless they ask for detail.
 - You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.
-- For most web interactions, use clickOn/typeInto with CSS selectors — it's faster and more reliable.
-- Use computerAction (AI vision clicking) when CSS selectors won't work: canvas elements, complex UIs, iframes, images, video players, or when you can see something on screen but can't find a selector for it.
-- computerAction takes a screenshot, uses AI vision to find coordinates, and clicks/types at exact positions.
+- For web interactions, prefer computerAction (AI vision clicking) as your primary tool — it takes a screenshot, uses AI vision to find coordinates, and clicks/types at exact positions. It works on everything: buttons, links, canvas, iframes, video players, complex UIs.
+- Fall back to clickOn/typeInto with CSS selectors only when computerAction fails or for simple, repetitive form-filling where speed matters.
+- Use getAccessibilitySnapshot to understand what's on the page, but act with computerAction.
 - Use contentAction to highlight text on the page and show a popup with a summary, rewrite, explanation, translation, or simplified version.
 - You have memory! Use rememberThis when the user asks you to remember something or when you learn important facts about them.
 - Use recallMemory when the user references past sessions or says "do you remember...".
@@ -121,7 +121,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setTabAudioEnabledState(enabled);
     if (enabled && sessionRef.current?.isConnected()) {
       addTrace("system", "Tab audio capture started");
-      playPageSparkleEffect("#c084fc").catch(() => {}); // Purple sparkles
+      playPageAudioEffect().catch(() => {});
       try {
         await startTabAudio((base64) => {
           sessionRef.current?.sendAudioBase64(base64);
@@ -287,7 +287,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (enabled && sessionRef.current?.isConnected()) {
       playVisionOn();
       addTrace("system", "Vision enabled");
-      playPageSparkleEffect("#67e8f9").catch(() => {}); // Cyan sparkles
+      playPageVisionEffect().catch(() => {});
       startVision((base64, mimeType) => {
         addTrace("vision_frame", "frame sent");
         sessionRef.current?.sendImage(base64, mimeType);

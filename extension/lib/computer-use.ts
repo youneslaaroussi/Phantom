@@ -53,7 +53,7 @@ export async function planComputerAction(task: string): Promise<ComputerUseResul
     addTrace("computer_use", `Planning: ${task}`);
 
     // 2. Send to server for Computer Use API call
-    const serverUrl = await getServerUrl();
+    const serverUrl = (await getServerUrl()).replace(/^wss:/, "https:").replace(/^ws:/, "http:");
     const response = await fetch(`${serverUrl.replace(/\/$/, "")}/api/computer-use`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

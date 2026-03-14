@@ -95,9 +95,11 @@ async function captureAndSend() {
       await hideIndicator();
       indicatorTabId = tab.id;
       if (!tab.url?.startsWith("chrome://")) {
+        const imgUrl = chrome.runtime.getURL("assets/" + currentPersonaImage);
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           func: SHOW_INDICATOR_SCRIPT,
+          args: [imgUrl],
         }).catch(() => {});
       }
     }
