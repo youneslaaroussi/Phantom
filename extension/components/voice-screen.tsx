@@ -67,6 +67,8 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom, onOpenMem
     setSpotlightEnabled,
     paused,
     setPaused,
+    activeMicName,
+    activeModel,
   } = useSession();
 
   const [textInput, setTextInput] = useState("");
@@ -138,6 +140,7 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom, onOpenMem
             {persona.name}
           </span>
         </div>
+
         <div className="flex items-center gap-0.5">
           <Tooltip text={spotlightEnabled ? "Spotlight on" : "Spotlight"}>
             <button
@@ -268,6 +271,11 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom, onOpenMem
       </div>
 
       <div className="flex-1 relative flex flex-col items-center justify-center">
+        {activeMicName && (
+          <span className="absolute top-3 left-1/2 -translate-x-1/2 text-[11px] font-google-text" style={{ color: "var(--g-outline)" }}>
+            {activeMicName}
+          </span>
+        )}
         <div className="relative z-10 mb-8">
           <AnimatedMascot
             state={
@@ -299,6 +307,12 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom, onOpenMem
           )}
         </button>
         </Tooltip>
+
+        {isConnected && (
+          <span className="relative z-10 mt-3 text-[10px] font-google-text" style={{ color: "var(--g-outline)" }}>
+            {activeModel.replace("gemini-2.5-flash-native-audio-preview-", "flash-audio-")}
+          </span>
+        )}
 
         <div className="relative z-10 mt-6 text-center min-h-[60px] max-w-sm px-4">
           {isConnecting && (

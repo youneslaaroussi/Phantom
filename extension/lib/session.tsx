@@ -24,6 +24,7 @@ import { startTabAudio, stopTabAudio, isTabAudioActive } from "./tab-audio";
 import { useToast } from "../components/toast";
 import { startVision, stopVision, isVisionActive } from "./vision";
 import { getSavedMicId } from "../components/mic-selector";
+import { getAudioInputDevices } from "./live/audio";
 import { startSession as startTrace, endSession as endTrace, addTrace } from "./trace";
 import { playConnect, playDisconnect, playToolStart, playToolEnd, playError, playListenStart, playListenStop, playVisionOn, playVisionOff, playWake, startThinking } from "./sounds";
 import { getSavedPersonaId, savePersonaId, getPersona, type Persona } from "./personas";
@@ -35,7 +36,8 @@ import { buildSessionContext } from "./context";
 import { showCaption } from "./captions";
 import { startEvents, stopEvents } from "./events";
 
-const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
+const MODEL_PRIMARY = "gemini-2.5-flash-native-audio-preview-12-2025";
+const MODEL_FALLBACK = "gemini-2.5-flash-native-audio-preview-09-2025";
 
 async function getActiveTabMeta(): Promise<string> {
   try {
@@ -107,6 +109,8 @@ interface SessionContextValue {
   setSpotlightEnabled: (enabled: boolean) => void;
   paused: boolean;
   setPaused: (paused: boolean) => void;
+  activeMicName: string;
+  activeModel: string;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -129,6 +133,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [tabAudioEnabled, setTabAudioEnabledState] = useState(false);
   const [spotlightEnabled, setSpotlightEnabledState] = useState(false);
   const [paused, setPausedState] = useState(false);
+  const [activeMicName, setActiveMicName] = useState("");
+  const modelRef = useRef(MODEL_PRIMARY);
+  const savedResumptionHandleRef = useRef<string | null>(null);
+  const autoReconnectingRef = useRef(false);
   const pausedInputsRef = useRef<{ vision: boolean; tabAudio: boolean; spotlight: boolean; listening: boolean }>({ vision: false, tabAudio: false, spotlight: false, listening: false });
   const sessionTranscriptRef = useRef<string[]>([]);
   const sessionToolCallsRef = useRef<string[]>([]);
@@ -185,6 +193,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     reconnectTranscriptRef.current = null;
 
     if (sessionRef.current) {
+      const oldHandle = sessionRef.current.getResumptionHandle();
+      if (oldHandle) savedResumptionHandleRef.current = oldHandle;
       sessionRef.current.disconnect();
       sessionRef.current = null;
     }
@@ -211,14 +221,20 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const session = new LiveSession(
       {
-        model: MODEL,
+        model: modelRef.current,
         systemInstruction: persona.prompt + TOOL_GUIDELINES + memoryContext + buildSessionContext() + agentConfig + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
         tools,
         responseModalities: ["AUDIO"],
         voice,
       },
       {
-        onStateChange: setState,
+        onStateChange: (s) => {
+          if (autoReconnectingRef.current && s.status === "connecting") return;
+          if (autoReconnectingRef.current && s.status === "connected") {
+            autoReconnectingRef.current = false;
+          }
+          setState(s);
+        },
         onTranscript: (text) => {
           setTranscript(text);
           if (text) {
@@ -269,28 +285,32 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           toast("error", err instanceof Error ? err.message : String(err));
           console.error("[Phantom] Session error:", err);
         },
-      }
+      },
+      savedResumptionHandleRef.current
     );
+    savedResumptionHandleRef.current = null;
 
     sessionRef.current = session;
     startTrace();
-    addTrace("system", `Connecting with model ${MODEL}, voice ${voice}`);
+    addTrace("system", `Connecting with model ${modelRef.current}, voice ${voice}`);
 
     try {
       const serverUrl = await getServerUrl();
       const wsUrl = serverUrl.replace(/\/$/, "") + "/ws/live";
       await session.connect({ proxyUrl: wsUrl });
-      addTrace("system", "Connected");
-      playConnect();
-      toast("success", "Connected");
+      const silent = autoReconnectingRef.current;
+      addTrace("system", silent ? "Silently reconnected" : "Connected");
+      if (!silent) {
+        playConnect();
+        toast("success", "Connected");
+        playPageLaunchEffect(persona.image).catch(() => {});
+      }
       startEvents((text) => {
         if (sessionRef.current?.isConnected()) {
           addTrace("system", text);
           sessionRef.current.sendText(text);
         }
       });
-      // Immersive launch effect on the actual page
-      playPageLaunchEffect(persona.image).catch(() => {});
       if (previousTranscript && previousTranscript.length > 0) {
         const traceWindow = previousTranscript.slice(-30).join("\n");
         session.sendText(`[SYSTEM] You were disconnected mid-conversation. Here is the conversation so far:\n${traceWindow}\n\nContinue naturally from where we left off. Do NOT re-introduce yourself or say hi again.`);
@@ -306,8 +326,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [voice, visionEnabled, persona]);
 
   const disconnect = useCallback(() => {
+    userDisconnectRef.current = true;
     playDisconnect();
     addTrace("system", "Disconnected");
+    modelRef.current = MODEL_PRIMARY;
 
     const transcript = sessionTranscriptRef.current.join("\n");
     const toolCalls = [...sessionToolCallsRef.current];
@@ -336,6 +358,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setExecutingTool(null);
     setInputLevel(0);
     setOutputLevel(0);
+    setActiveMicName("");
   }, []);
 
   // Vision toggle
@@ -455,6 +478,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     const micId = deviceId || await getSavedMicId();
+    try {
+      const devices = await getAudioInputDevices();
+      const match = devices.find((d) => d.deviceId === micId);
+      setActiveMicName(match?.label || devices[0]?.label || "Microphone");
+    } catch {}
     playListenStart();
     await sessionRef.current.startListening({
       deviceId: micId,
@@ -481,30 +509,36 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     sessionRef.current.cancelToolExecution();
   }, []);
 
-  // Auto-reconnect on unexpected disconnect (not user-initiated)
   const wasConnectedRef = useRef(false);
+  const userDisconnectRef = useRef(false);
   useEffect(() => {
     if (state.status === "connected") {
       wasConnectedRef.current = true;
     }
-    if (state.status === "disconnected" && wasConnectedRef.current && state.closeCode !== undefined && state.closeCode !== 1000) {
-      // Unexpected disconnect — try to reconnect after a short delay
+    if (state.status === "disconnected" && wasConnectedRef.current) {
       wasConnectedRef.current = false;
-      const timer = setTimeout(() => {
-        console.log("[Phantom] Auto-reconnecting after unexpected disconnect...");
-        reconnectTranscriptRef.current = [...sessionTranscriptRef.current];
-        connect().catch(() => {});
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-    if (state.status === "disconnected") {
-      wasConnectedRef.current = false;
-      if (isTabAudioActive()) {
-        stopTabAudio();
-        setTabAudioEnabledState(false);
+
+      if (userDisconnectRef.current) {
+        userDisconnectRef.current = false;
+        if (isTabAudioActive()) {
+          stopTabAudio();
+          setTabAudioEnabledState(false);
+        }
+        return;
       }
+
+      autoReconnectingRef.current = true;
+      const is1008 = state.closeReason?.includes("1008");
+      if (is1008 && modelRef.current === MODEL_PRIMARY) {
+        modelRef.current = MODEL_FALLBACK;
+        addTrace("system", `1008 detected — switching to fallback model ${MODEL_FALLBACK}`);
+      }
+
+      reconnectTranscriptRef.current = [...sessionTranscriptRef.current];
+      addTrace("system", `Auto-reconnecting (code=${state.closeCode} reason=${state.closeReason?.slice(0, 80)})`);
+      connect().catch(() => {});
     }
-  }, [state.status, state.closeCode, connect]);
+  }, [state.status, state.closeCode, state.closeReason, connect]);
 
   useEffect(() => {
     return () => {
@@ -540,6 +574,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setSpotlightEnabled,
         paused,
         setPaused,
+        activeMicName,
+        activeModel: modelRef.current,
       }}
     >
       {children}

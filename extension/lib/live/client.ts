@@ -36,9 +36,10 @@ export class LiveSession {
   private toolAbortController: AbortController | null = null;
   private inputGated = false;
 
-  constructor(config: LiveSessionConfig, callbacks: LiveSessionCallbacks = {}) {
+  constructor(config: LiveSessionConfig, callbacks: LiveSessionCallbacks = {}, resumptionHandle?: string | null) {
     this.config = config;
     this.callbacks = callbacks;
+    if (resumptionHandle) this.resumptionHandle = resumptionHandle;
   }
 
   private setState(updates: Partial<LiveSessionState>) {
@@ -59,6 +60,28 @@ export class LiveSession {
     await this.audioPlayer.init(this.callbacks.onOutputLevel);
 
     this.ws = new WebSocket(opts.proxyUrl);
+
+    const origSend = this.ws.send.bind(this.ws);
+    this.ws.send = (data: string | ArrayBufferLike | Blob | ArrayBufferView) => {
+      if (typeof data === "string") {
+        try {
+          const parsed = JSON.parse(data);
+          const type = parsed.setup ? "setup" : parsed.realtimeInput ? "realtimeInput" : parsed.clientContent ? "clientContent" : parsed.toolResponse ? "toolResponse" : "unknown";
+          if (type === "realtimeInput" && this.inputGated) {
+            addTrace("error", `WS SEND BLOCKED (gated): ${type} — ${parsed.realtimeInput?.audio ? "audio" : parsed.realtimeInput?.video ? "video" : parsed.realtimeInput?.text ? "text" : parsed.realtimeInput?.audioStreamEnd ? "audioStreamEnd" : "other"}`);
+            return;
+          }
+          if (type === "clientContent" && this.inputGated) {
+            addTrace("error", `WS SEND BLOCKED (gated): clientContent`);
+            return;
+          }
+          if (type !== "realtimeInput" || !parsed.realtimeInput?.audio) {
+            addTrace("system", `WS SEND: ${type}${type === "realtimeInput" ? (parsed.realtimeInput?.video ? " (video)" : parsed.realtimeInput?.audio ? " (audio)" : " (text)") : ""}`);
+          }
+        } catch {}
+      }
+      origSend(data);
+    };
 
     return new Promise((resolve, reject) => {
       if (!this.ws) return reject(new Error("WebSocket not initialized"));
@@ -199,6 +222,7 @@ export class LiveSession {
         }
 
         if (content.modelTurn?.parts) {
+          if (!this.inputGated) addTrace("system", "GATE ON (modelTurn)");
           this.inputGated = true;
           for (const part of content.modelTurn.parts) {
             if (part.inlineData?.data) {
@@ -222,12 +246,14 @@ export class LiveSession {
         }
 
         if (content.turnComplete) {
+          addTrace("system", "GATE OFF (turnComplete)");
           this.inputGated = false;
           this.setState({ isSpeaking: false });
         }
       }
 
       if (message.toolCall?.functionCalls) {
+        addTrace("system", `GATE ON (toolCall: ${message.toolCall.functionCalls.map((f: any) => f.name).join(", ")})`);
         this.inputGated = true;
         this.handleToolCalls(message.toolCall.functionCalls);
       }
@@ -304,6 +330,7 @@ export class LiveSession {
 
   private sendToolResponses(responses: ToolCallResponse[]) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    addTrace("system", "GATE OFF (toolResponse sent)");
     this.inputGated = false;
 
     const message = {
@@ -363,7 +390,10 @@ export class LiveSession {
 
   private sendAudio(audioData: ArrayBuffer) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    if (this.inputGated) return;
+    if (this.inputGated) {
+      addTrace("system", "sendAudio GATED (dropped)");
+      return;
+    }
 
     const message = {
       realtimeInput: {
@@ -390,7 +420,10 @@ export class LiveSession {
 
   sendText(text: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    if (this.inputGated) return;
+    if (this.inputGated) {
+      addTrace("system", `sendText GATED (dropped): ${text.slice(0, 80)}`);
+      return;
+    }
 
     const message = {
       clientContent: {
@@ -409,7 +442,10 @@ export class LiveSession {
 
   sendImage(base64Data: string, mimeType: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    if (this.inputGated) return;
+    if (this.inputGated) {
+      addTrace("system", "sendImage GATED (dropped)");
+      return;
+    }
 
     const message = {
       realtimeInput: {
@@ -421,7 +457,7 @@ export class LiveSession {
     };
 
     const payload = JSON.stringify(message);
-    console.log("[LiveSession] sendImage: %d KB, mimeType=%s", Math.round(payload.length / 1024), mimeType);
+    addTrace("system", `sendImage SENT: ${Math.round(payload.length / 1024)} KB`);
     this.ws.send(payload);
   }
 
