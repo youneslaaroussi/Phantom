@@ -52,12 +52,14 @@ async function getActiveTabMeta(): Promise<string> {
 const TOOL_GUIDELINES = `
 
 Guidelines:
-- Be proactive! Don't wait to be told every little step — figure things out on your own. If the user gives you a goal, take initiative to accomplish it, exploring the page and making decisions yourself.
-- Be conversational and talkative. Share what you're doing, what you notice, and your thoughts naturally. React to what's happening on screen. Engage the user like a helpful companion, not a silent tool.
+- ACT FIRST, TALK SECOND. When the user asks you to do something, DO IT IMMEDIATELY. Call the tools right away. Don't describe what you're "about to do" or "planning to do" — just do it. Never say "I will now proceed to..." — just proceed.
+- Be extremely proactive. If the user says "close all tabs except X", call getTabs and then closeTab for each one in rapid succession. Don't stop to narrate between each action.
+- When you get tool results, keep going. Don't pause to summarize intermediate results. Chain tool calls back-to-back until the task is fully complete.
+- Be conversational but brief. A quick confirmation after the task is done is enough. Don't narrate every step.
 - After using a tool, confirm what happened naturally, as if you did it yourself. Don't mention tool names or describe your internal process.
 - If something fails, try an alternative approach on your own before asking the user. Only explain if you're truly stuck.
 - Don't read long text aloud — summarize it instead.
-- You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively without being asked.
+- You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them immediately without being asked twice.
 - When asked to click buttons, links, icons, or interact with UI elements, prefer computerAction (AI vision clicking) — it's more reliable for visual interactions and works across all UI types.
 - For filling forms, typing into inputs, dropdowns, checkboxes, and standard HTML form controls, prefer the DOM tools (clickOn, typeInto, pressKey) with CSS selectors — they are faster and more reliable for structured form elements.
 - Use getAccessibilitySnapshot to understand what's on the page when you need to find form fields or understand page structure.
@@ -137,6 +139,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const modelRef = useRef(MODEL_PRIMARY);
   const savedResumptionHandleRef = useRef<string | null>(null);
   const autoReconnectingRef = useRef(false);
+  const internalStateRef = useRef<LiveSessionState | null>(null);
+  const [reconnectTick, setReconnectTick] = useState(0);
   const pausedInputsRef = useRef<{ vision: boolean; tabAudio: boolean; spotlight: boolean; listening: boolean }>({ vision: false, tabAudio: false, spotlight: false, listening: false });
   const sessionTranscriptRef = useRef<string[]>([]);
   const sessionToolCallsRef = useRef<string[]>([]);
@@ -195,6 +199,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (sessionRef.current) {
       const oldHandle = sessionRef.current.getResumptionHandle();
       if (oldHandle) savedResumptionHandleRef.current = oldHandle;
+      wasConnectedRef.current = false;
       sessionRef.current.disconnect();
       sessionRef.current = null;
     }
@@ -229,9 +234,30 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       },
       {
         onStateChange: (s) => {
-          if (autoReconnectingRef.current && s.status === "connecting") return;
-          if (autoReconnectingRef.current && s.status === "connected") {
+          if (autoReconnectingRef.current && !userDisconnectRef.current) {
+            if (s.status === "connected") {
+
+              autoReconnectingRef.current = false;
+              setState(s);
+            }
+            if (s.status === "disconnected") {
+
+              internalStateRef.current = s;
+              setReconnectTick((t) => t + 1);
+            }
+            return;
+          }
+          if (userDisconnectRef.current) {
+
             autoReconnectingRef.current = false;
+            setState(s);
+            return;
+          }
+          if (s.status === "disconnected" && wasConnectedRef.current) {
+            autoReconnectingRef.current = true;
+            internalStateRef.current = s;
+            setReconnectTick((t) => t + 1);
+            return;
           }
           setState(s);
         },
@@ -282,8 +308,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         },
         onError: (err) => {
           addTrace("error", err instanceof Error ? err.message : String(err));
-          toast("error", err instanceof Error ? err.message : String(err));
-          console.error("[Phantom] Session error:", err);
+          if (!silent && !autoReconnectingRef.current) {
+            toast("error", err instanceof Error ? err.message : String(err));
+          }
         },
       },
       savedResumptionHandleRef.current
@@ -294,11 +321,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     startTrace();
     addTrace("system", `Connecting with model ${modelRef.current}, voice ${voice}`);
 
+    const silent = autoReconnectingRef.current;
     try {
       const serverUrl = await getServerUrl();
       const wsUrl = serverUrl.replace(/\/$/, "") + "/ws/live";
       await session.connect({ proxyUrl: wsUrl });
-      const silent = autoReconnectingRef.current;
       addTrace("system", silent ? "Silently reconnected" : "Connected");
       if (!silent) {
         playConnect();
@@ -318,15 +345,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         session.sendText("Say hi! Greet the user briefly in character. Keep it to one short sentence.");
       }
     } catch (err) {
-      addTrace("error", `Connect failed: ${err instanceof Error ? err.message : String(err)}`);
-      playError();
-      toast("error", `Connection failed: ${err instanceof Error ? err.message : String(err)}`);
-      console.error("[Phantom] Connect failed:", err);
+      addTrace("error", `Connect failed: ${err instanceof Error ? err.message : String(err)} (silent=${silent} autoReconnecting=${autoReconnectingRef.current})`);
+      if (!silent) {
+        playError();
+        toast("error", `Connection failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }, [voice, visionEnabled, persona]);
 
   const disconnect = useCallback(() => {
+
     userDisconnectRef.current = true;
+    autoReconnectingRef.current = false;
+    sessionRef.current?.cancelToolExecution();
     playDisconnect();
     addTrace("system", "Disconnected");
     modelRef.current = MODEL_PRIMARY;
@@ -354,6 +385,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     sessionRef.current?.disconnect();
     sessionRef.current = null;
+    setState({ status: "disconnected", isListening: false, isSpeaking: false });
     setTranscript("");
     setExecutingTool(null);
     setInputLevel(0);
@@ -511,14 +543,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const wasConnectedRef = useRef(false);
   const userDisconnectRef = useRef(false);
+
   useEffect(() => {
     if (state.status === "connected") {
       wasConnectedRef.current = true;
     }
     if (state.status === "disconnected" && wasConnectedRef.current) {
       wasConnectedRef.current = false;
-
+      addTrace("system", `[useEffect] disconnected. userDisconnect=${userDisconnectRef.current} autoReconnecting=${autoReconnectingRef.current}`);
       if (userDisconnectRef.current) {
+        addTrace("system", "[useEffect] user disconnect — not reconnecting");
         userDisconnectRef.current = false;
         if (isTabAudioActive()) {
           stopTabAudio();
@@ -526,19 +560,32 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         }
         return;
       }
-
       autoReconnectingRef.current = true;
       const is1008 = state.closeReason?.includes("1008");
       if (is1008 && modelRef.current === MODEL_PRIMARY) {
         modelRef.current = MODEL_FALLBACK;
-        addTrace("system", `1008 detected — switching to fallback model ${MODEL_FALLBACK}`);
+        addTrace("system", `1008 detected — switching to ${MODEL_FALLBACK}`);
       }
-
       reconnectTranscriptRef.current = [...sessionTranscriptRef.current];
-      addTrace("system", `Auto-reconnecting (code=${state.closeCode} reason=${state.closeReason?.slice(0, 80)})`);
+      addTrace("system", `[useEffect] Auto-reconnecting (code=${state.closeCode} reason=${state.closeReason?.slice(0, 80)})`);
       connect().catch(() => {});
     }
   }, [state.status, state.closeCode, state.closeReason, connect]);
+
+  useEffect(() => {
+    if (!reconnectTick || !autoReconnectingRef.current) return;
+    const s = internalStateRef.current;
+    if (!s) return;
+    internalStateRef.current = null;
+    const is1008 = s.closeReason?.includes("1008");
+    if (is1008 && modelRef.current === MODEL_PRIMARY) {
+      modelRef.current = MODEL_FALLBACK;
+      addTrace("system", `1008 detected — switching to ${MODEL_FALLBACK}`);
+    }
+    reconnectTranscriptRef.current = [...sessionTranscriptRef.current];
+    addTrace("system", `Silent reconnect (code=${s.closeCode} reason=${s.closeReason?.slice(0, 80)})`);
+    connect().catch(() => {});
+  }, [reconnectTick, connect]);
 
   useEffect(() => {
     return () => {
