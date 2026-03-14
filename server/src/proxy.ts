@@ -45,13 +45,58 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
   async function initSession(setupMsg: Record<string, unknown>) {
     const ai = new GoogleGenAI({ apiKey });
     const setup = setupMsg.setup as Record<string, unknown>;
+    const genConfig = (setup.generationConfig || {}) as Record<string, unknown>;
 
     const config: Record<string, unknown> = {};
-    if (setup.generationConfig) config.responseModalities = (setup.generationConfig as Record<string, unknown>).responseModalities;
+
+    // Response modalities
+    if (genConfig.responseModalities) config.responseModalities = genConfig.responseModalities;
+
+    // System instruction
     if (setup.systemInstruction) config.systemInstruction = setup.systemInstruction;
+
+    // Tools (function calling)
     if (setup.tools) config.tools = setup.tools;
-    if ((setup.generationConfig as Record<string, unknown>)?.speechConfig) {
-      config.speechConfig = (setup.generationConfig as Record<string, unknown>).speechConfig;
+
+    // Voice / speech config
+    if (genConfig.speechConfig) config.speechConfig = genConfig.speechConfig;
+
+    // ─── Session Resumption ───
+    // Allows seamless reconnection when the ~10 min WebSocket resets.
+    // Server sends SessionResumptionUpdate with a handle token;
+    // client stores it and passes it back on reconnect.
+    config.sessionResumption = setup.sessionResumption || {};
+
+    // ─── Context Window Compression ───
+    // Sliding window compression so sessions can run much longer
+    // (without this: audio-only ~15min, audio+video ~2min)
+    config.contextWindowCompression = {
+      slidingWindow: {},
+      ...(setup.contextWindowCompression as object || {}),
+    };
+
+    // ─── Audio Transcription ───
+    // Get text transcripts of both user speech and model speech.
+    config.inputAudioTranscription = setup.inputAudioTranscription || {};
+    config.outputAudioTranscription = setup.outputAudioTranscription || {};
+
+    // ─── Affective Dialog ───
+    // Model picks up on tone, emotion, pace for natural conversation.
+    if (genConfig.enableAffectiveDialog !== false) {
+      config.enableAffectiveDialog = true;
+    }
+
+    // ─── Proactive Audio ───
+    // Model only responds when relevant — prevents talking over noise.
+    if (setup.proactivity || genConfig.proactiveAudio !== false) {
+      config.proactivity = setup.proactivity || { proactiveAudio: true };
+    }
+
+    // ─── Google Search Grounding ───
+    // Pass through if client requests it
+    if (setup.googleSearch) {
+      if (!config.tools) config.tools = [];
+      (config.tools as any[]).push({ googleSearch: setup.googleSearch });
     }
 
     const modelName = (setup.model as string || "").replace("models/", "");
