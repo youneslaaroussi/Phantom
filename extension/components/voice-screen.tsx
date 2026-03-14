@@ -5,12 +5,14 @@
  * Minimal, dark.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Mic, Square, Settings, Eye, EyeOff, Terminal, Volume2, VolumeX } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
 import { MarkdownText } from "./markdown";
 import { AnimatedMascot } from "./animated-mascot";
+import { playLaunchAnimation } from "../lib/launch-animation";
+import { playSparkles } from "../lib/sparkle-effect";
 
 import type { LiveVoiceName } from "../lib/live/types";
 
@@ -42,6 +44,26 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
   } = useSession();
 
   const [textInput, setTextInput] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [launchDone, setLaunchDone] = useState(false);
+  const visionBtnRef = useRef<HTMLButtonElement>(null);
+  const audioBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Launch animation on first mount
+  useEffect(() => {
+    if (containerRef.current && !launchDone) {
+      const mascotEl = containerRef.current.querySelector("[data-mascot]") as HTMLElement | null;
+      playLaunchAnimation(containerRef.current, () => {
+        // Mascot pop-in
+        if (mascotEl) {
+          mascotEl.style.transition = "transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease-out";
+          mascotEl.style.transform = "scale(1)";
+          mascotEl.style.opacity = "1";
+        }
+        setLaunchDone(true);
+      });
+    }
+  }, []);
 
   const isConnected = state.status === "connected";
   const isConnecting = state.status === "connecting";
@@ -86,7 +108,7 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
   };
 
   return (
-    <div className="relative w-full h-full flex flex-col" style={{ background: "#0a0a12" }}>
+    <div ref={containerRef} className="relative w-full h-full flex flex-col" style={{ background: "#0a0a12" }}>
       {/* Header */}
       <div className="relative z-20 flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
@@ -95,7 +117,20 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setVisionEnabled(!visionEnabled)}
+            ref={visionBtnRef}
+            onClick={() => {
+              const turning = !visionEnabled;
+              setVisionEnabled(turning);
+              if (turning && containerRef.current) {
+                const r = visionBtnRef.current?.getBoundingClientRect();
+                const cr = containerRef.current.getBoundingClientRect();
+                playSparkles(containerRef.current, {
+                  originX: r ? r.left - cr.left + r.width / 2 : undefined,
+                  originY: r ? r.top - cr.top + r.height / 2 : undefined,
+                  color: "#67e8f9",
+                });
+              }
+            }}
             className={`p-1.5 rounded-lg transition-colors ${
               visionEnabled
                 ? "bg-cyan-500/20 text-cyan-400"
@@ -109,7 +144,20 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
             }
           </button>
           <button
-            onClick={() => setTabAudioEnabled(!tabAudioEnabled)}
+            ref={audioBtnRef}
+            onClick={() => {
+              const turning = !tabAudioEnabled;
+              setTabAudioEnabled(turning);
+              if (turning && containerRef.current) {
+                const r = audioBtnRef.current?.getBoundingClientRect();
+                const cr = containerRef.current.getBoundingClientRect();
+                playSparkles(containerRef.current, {
+                  originX: r ? r.left - cr.left + r.width / 2 : undefined,
+                  originY: r ? r.top - cr.top + r.height / 2 : undefined,
+                  color: "#c084fc",
+                });
+              }
+            }}
             className={`p-1.5 rounded-lg transition-colors ${
               tabAudioEnabled
                 ? "bg-purple-500/20 text-purple-400"
@@ -142,7 +190,7 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
       {/* Main area — mascot + mic button */}
       <div className="flex-1 relative flex flex-col items-center justify-center">
         {/* Animated mascot */}
-        <div className="relative z-10 mb-6">
+        <div className="relative z-10 mb-6" data-mascot style={{ transform: launchDone ? "scale(1)" : "scale(0)", opacity: launchDone ? "1" : "0" }}>
           <AnimatedMascot
             state={
               executingTool ? "thinking"
