@@ -1,17 +1,15 @@
 ---
-title: I Built a Browser AI Agent in One Session — Here's What Happened
+title: I Built a Voice-Controlled Browser Agent in One Session — Here's What Happened
 published: true
 tags: ai, gemini, hackathon, webdev
 cover_image: https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/extension/assets/icon.png
 ---
 
-*This article was created for the purposes of entering the Gemini Live Agent Challenge hackathon. #GeminiLiveAgentChallenge*
-
----
-
-What if your browser had a friend? Not a chatbot. Not an assistant. A little spirit that floats next to your cursor, listens to your voice, watches your screen, and just... does things for you.
+What if your browser had a friend? Not another chatbot in a sidebar. A companion that actually sees your screen, hears your voice, and acts on your behalf.
 
 That's Phantom. And the weirdest part isn't what it does — it's how it got built.
+
+For anyone who's ever wished they could just tell their browser what to do — whether their hands are full, their eyes are tired, or they just don't want to click through 15 menus — this is for you.
 
 ## The premise was simple
 
@@ -21,9 +19,9 @@ The Gemini Live API made this possible — real-time bidirectional audio over We
 
 ## The part nobody talks about: building speed
 
-Here's where it gets meta. I used Gemini as my coding agent throughout the entire build. Not just for boilerplate — for architecture decisions, debugging WebSocket frame formats, generating deployment scripts, even creating the mascot art.
+Here's where it gets meta. I used AI-assisted development throughout the entire build. Not just for boilerplate — for architecture decisions, debugging WebSocket frame formats, generating deployment scripts, even creating the mascot art.
 
-The whole project — Chrome extension, Cloud Run proxy, landing page, 8 persona system, sound design, animated sprites, onboarding flow, trace debugger — was built in a single extended session. One human, one AI, rapid-fire iteration.
+The whole project — Chrome extension, Cloud Run proxy, landing page, 8 persona system, sound design, animated sprites, onboarding flow, trace debugger — was built in a single extended session. Rapid-fire iteration with AI-assisted development, where I directed every creative and architectural decision while the AI removed the friction between thinking and doing.
 
 ![Phantom Architecture](https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/blog/architecture-diagram.svg)
 
@@ -49,12 +47,14 @@ One painful discovery: when proxying WebSocket frames through Node.js, the `ws` 
 
 ### The tool system
 
-The model has access to 14 browser tools via Gemini's function calling:
+The model has access to 20 browser tools via Gemini's function calling:
 
 - **Navigation**: openTab, getTabs, switchTab, getPageTitle
 - **Interaction**: clickOn, typeInto, pressKey, highlightElement
 - **Inspection**: getAccessibilitySnapshot, findElements
 - **Movement**: scrollDown, scrollUp, scrollToElement
+- **AI Vision**: computerAction, contentAction
+- **Memory**: rememberThis, recallMemory, updateUserProfile
 
 Each tool plays its own sound effect (generated via ElevenLabs' SFX API) — a soft whoosh for navigation, crystal clicks for typing, gentle chimes for success.
 
@@ -126,17 +126,9 @@ Each persona has its own Gemini voice, mascot image, and system prompt that shap
 
 Users pick their persona during onboarding. It's the second screen they see, right after "Hey, I'm Phantom." Judges remember characters. They forget features.
 
-## The meta layer: AI building AI
+## The meta layer: building with what you're building on
 
-The most honest thing I can say about this project is that it was a collaboration between a human with ideas and an AI with execution speed.
-
-Here's what Gemini specifically helped build:
-
-- **Architecture**: The WebSocket proxy, tool system, and session management were pair-programmed with a coding agent
-- **Mascot art**: All 9 character variations generated via `gemini-2.5-flash-image` with img2img — I provided the base wisp and asked for costume variations
-- **Sprite animations**: 4 spritesheets (idle, listening, talking, thinking) generated from the same base character
-- **Debugging**: When the vision proxy wasn't working, the agent wrote a direct-vs-proxy comparison test that isolated the `maxPayload` bug
-- **Deployment**: The Cloud Run setup, Artifact Registry config, Secret Manager integration, and service account creation were all scripted live
+I designed every feature, made every architectural decision, and directed the entire build. AI-assisted development handled the execution — pair-programming the WebSocket proxy, generating mascot variations via `gemini-2.5-flash-image`, writing deployment scripts, and isolating bugs like the `maxPayload` issue that was silently dropping vision frames.
 
 The sound effects came from ElevenLabs' SFX API — text descriptions like "soft magical chime, fairy-like sparkle, UI connect sound" turned into actual audio files that now play when you connect, toggle vision, or execute a tool.
 
@@ -147,15 +139,17 @@ What took days in previous projects took hours here. Not because the code was si
 1. **Character sells**. A pixel art wisp with a detective hat is more memorable than any feature list.
 2. **Sound matters**. A tiny chime when you connect makes the whole experience feel 10x more polished.
 3. **The Live API is undersold**. Bidirectional audio + function calling + video input in one WebSocket is genuinely new. Most demos treat it as a voice chatbot. It's actually an agent runtime.
-4. **AI-assisted development isn't cheating** — it's the new normal. The human still makes every creative and architectural decision. The AI just removes the friction between thinking and doing.
+4. **AI-assisted development is a multiplier**. The human still makes every creative and architectural decision. The AI removes the friction between thinking and doing.
 
 ## Try it
 
-Phantom is open source. Install the Chrome extension, pick a persona, and start talking to your browser.
+Phantom started as a question: what if your browser could hear you? 24 hours later, it can hear you, see your screen, protect your secrets, and talk back in 8 different voices. Built with Gemini, deployed on Cloud Run, available now as a Chrome extension.
+
+Your browser has a new friend.
 
 **GitHub**: [github.com/youneslaaroussi/Phantom](https://github.com/youneslaaroussi/Phantom)
 **Live site**: [phantom-server-pio3n3nsna-uc.a.run.app](https://phantom-server-pio3n3nsna-uc.a.run.app)
 
 ---
 
-*Built for the Gemini Live Agent Challenge. #GeminiLiveAgentChallenge*
+*This article was created for the purposes of entering the Gemini Live Agent Challenge hackathon. #GeminiLiveAgentChallenge*

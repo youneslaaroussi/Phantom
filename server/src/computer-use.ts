@@ -30,7 +30,19 @@ function nextApiKey(): string | undefined {
 }
 
 interface ComputerUseAction {
-  type: "click" | "doubleClick" | "type" | "scroll" | "drag" | "keyPress" | "hover" | "wait";
+  type:
+    | "click"
+    | "doubleClick"
+    | "type"
+    | "scroll"
+    | "drag"
+    | "keyPress"
+    | "hover"
+    | "wait"
+    | "navigate"
+    | "goBack"
+    | "goForward"
+    | "search";
   x?: number;
   y?: number;
   endX?: number;
@@ -40,6 +52,9 @@ interface ComputerUseAction {
   direction?: string;
   amount?: number;
   delayMs?: number;
+  url?: string;
+  pressEnter?: boolean;
+  clearBeforeTyping?: boolean;
 }
 
 interface ComputerUseRequest {
@@ -254,31 +269,52 @@ function mapNativeFunctionCall(fc: any): ComputerUseAction | null {
   const args = fc.args || {};
 
   switch (name) {
+    case "open_web_browser":
+      return null;
+    case "wait_5_seconds":
+      return { type: "wait", delayMs: 5000 };
+    case "go_back":
+      return { type: "goBack" };
+    case "go_forward":
+      return { type: "goForward" };
+    case "search":
+      return { type: "search" };
+    case "navigate":
+      return { type: "navigate", url: args.url };
     case "click_at":
       return { type: "click", x: args.x, y: args.y };
     case "double_click_at":
       return { type: "doubleClick", x: args.x, y: args.y };
     case "hover_at":
       return { type: "hover", x: args.x, y: args.y };
-    case "type_text":
-      return { type: "type", text: args.text };
-    case "press_key":
-    case "key_press":
-      return { type: "keyPress", key: args.key };
-    case "scroll":
+    case "type_text_at":
+      return {
+        type: "type",
+        x: args.x,
+        y: args.y,
+        text: args.text,
+        pressEnter: args.press_enter ?? true,
+        clearBeforeTyping: args.clear_before_typing ?? true,
+      };
+    case "key_combination":
+      return { type: "keyPress", key: args.keys };
+    case "scroll_document":
+      return { type: "scroll", direction: args.direction || "down" };
+    case "scroll_at":
       return {
         type: "scroll",
+        x: args.x,
+        y: args.y,
         direction: args.direction || "down",
-        amount: args.amount || 500,
+        amount: args.magnitude ?? 800,
       };
-    case "drag":
-    case "drag_to":
+    case "drag_and_drop":
       return {
         type: "drag",
-        x: args.startX || args.x,
-        y: args.startY || args.y,
-        endX: args.endX,
-        endY: args.endY,
+        x: args.x,
+        y: args.y,
+        endX: args.destination_x,
+        endY: args.destination_y,
       };
     case "wait":
       return { type: "wait", delayMs: args.ms || args.delayMs || 1000 };
