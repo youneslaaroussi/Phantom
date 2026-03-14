@@ -3,7 +3,7 @@
     <filter id="sc"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
     <marker id="ac" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#5F6368"/></marker>
   </defs>
-  <rect width="800" height="200" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
+  <rect width="800" height="240" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
   <text x="400" y="28" text-anchor="middle" fill="#5F6368" font-size="11" font-weight="500">COMPUTER USE — AI VISION CLICKING</text>
 
   <!-- Agent Task — lucide sparkles -->
