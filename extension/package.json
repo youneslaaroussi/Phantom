@@ -34,7 +34,8 @@
       "storage",
       "scripting",
       "tabs",
-      "tabCapture"
+      "tabCapture",
+      "debugger"
     ],
     "content_security_policy": {
       "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self';"

@@ -35,6 +35,42 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true;
   }
+
+  if (message.type === "CDP_CLICK") {
+    const { tabId, selector } = message;
+    (async () => {
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: (sel: string) => {
+            const el = document.querySelector(sel) as HTMLElement | null;
+            if (!el) return null;
+            const rect = el.getBoundingClientRect();
+            return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+          },
+          args: [selector],
+        });
+        const pt = results[0]?.result;
+        if (!pt) { sendResponse({ error: `Element not found: ${selector}` }); return; }
+        const target = { tabId };
+        await chrome.debugger.attach(target, "1.3");
+        try {
+          await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+            type: "mousePressed", x: pt.x, y: pt.y, button: "left", clickCount: 1,
+          });
+          await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+            type: "mouseReleased", x: pt.x, y: pt.y, button: "left", clickCount: 1,
+          });
+        } finally {
+          await chrome.debugger.detach(target);
+        }
+        sendResponse({ success: true });
+      } catch (err) {
+        sendResponse({ error: err instanceof Error ? err.message : String(err) });
+      }
+    })();
+    return true;
+  }
 });
 
 export {};

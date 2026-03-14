@@ -173,8 +173,12 @@ function ActionPopover({ el, onClose }: { el: DomElement; onClose: () => void })
     setResult({ status: "running" });
     try {
       const res = await executeTool(name, args);
-      setResult({ status: "success", message: JSON.stringify(res).slice(0, 200) });
-      setTimeout(() => setResult({ status: "idle" }), 2000);
+      if (res.error) {
+        setResult({ status: "error", message: String(res.error) });
+      } else {
+        setResult({ status: "success", message: JSON.stringify(res).slice(0, 200) });
+        setTimeout(() => setResult({ status: "idle" }), 2000);
+      }
     } catch (err) {
       setResult({ status: "error", message: err instanceof Error ? err.message : String(err) });
     }
@@ -311,25 +315,26 @@ function ElementRow({ el }: { el: DomElement }) {
           {el.name || "(unnamed)"}
         </span>
         <CopyButton text={el.selector} label="Copy selector" />
-        <Tooltip text="Actions" position="top">
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
-            className="p-1 rounded transition-colors shrink-0"
-            style={{ color: showActions ? "var(--g-blue)" : "var(--g-outline)", background: showActions ? "var(--g-blue-bg)" : "transparent" }}
-          >
-            <MoreHorizontal className="w-3 h-3" />
-          </button>
-        </Tooltip>
+        <div className="relative shrink-0">
+          <Tooltip text="Actions" position="top">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
+              className="p-1 rounded transition-colors"
+              style={{ color: showActions ? "var(--g-blue)" : "var(--g-outline)", background: showActions ? "var(--g-blue-bg)" : "transparent" }}
+            >
+              <MoreHorizontal className="w-3 h-3" />
+            </button>
+          </Tooltip>
+          {showActions && (
+            <ActionPopover el={el} onClose={() => setShowActions(false)} />
+          )}
+        </div>
         {attrEntries.length > 0 && (
           expanded
             ? <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--g-outline)" }} />
             : <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--g-outline)" }} />
         )}
       </div>
-
-      {showActions && (
-        <ActionPopover el={el} onClose={() => setShowActions(false)} />
-      )}
 
       {expanded && (
         <div className="ml-7 pb-2 space-y-1.5">

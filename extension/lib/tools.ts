@@ -490,6 +490,25 @@ async function executeToolInternal(
       const selector = args.selector as string;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
+      // Scroll into view if not visible
+      const visCheck = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (sel: string) => {
+          const el = document.querySelector(sel) as HTMLElement | null;
+          if (!el) return "not_found";
+          const rect = el.getBoundingClientRect();
+          const inView = rect.top >= 0 && rect.bottom <= window.innerHeight && rect.left >= 0 && rect.right <= window.innerWidth;
+          if (!inView) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            return "scrolled";
+          }
+          return "visible";
+        },
+        args: [selector],
+      });
+      const vis = visCheck[0]?.result;
+      if (vis === "not_found") return { success: false, error: `Element not found: ${selector}` };
+      if (vis === "scrolled") await new Promise((r) => setTimeout(r, 600));
       // Show agent cursor at target
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -498,15 +517,13 @@ async function executeToolInternal(
       });
       // Wait for cursor animation then click
       await new Promise((r) => setTimeout(r, 450));
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: (sel: string) => {
-          const el = document.querySelector(sel) as HTMLElement | null;
-          if (!el) throw new Error(`Element not found: ${sel}`);
-          el.click();
-        },
-        args: [selector],
+      // Use background service worker to dispatch trusted CDP click
+      const response = await chrome.runtime.sendMessage({
+        type: "CDP_CLICK",
+        tabId: tab.id,
+        selector,
       });
+      if (response?.error) return { success: false, error: response.error };
       return { success: true, result: `Clicked on ${selector}` };
     }
 
@@ -573,10 +590,15 @@ async function executeToolInternal(
       const pixels = (args.pixels as number) || 500;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
+      const vpDown = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => ({ w: window.innerWidth, h: window.innerHeight }),
+      });
+      const dVp = vpDown[0]?.result ?? { w: 960, h: 540 };
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: _injectScrollCursor,
-        args: [window.innerWidth / 2, window.innerHeight / 2, "down", pixels],
+        args: [dVp.w / 2, dVp.h / 2, "down", pixels],
       });
       return { success: true, result: `Scrolled down ${pixels}px` };
     }
@@ -586,10 +608,15 @@ async function executeToolInternal(
       const pixels = (args.pixels as number) || 500;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
+      const vpUp = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => ({ w: window.innerWidth, h: window.innerHeight }),
+      });
+      const uVp = vpUp[0]?.result ?? { w: 960, h: 540 };
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: _injectScrollCursor,
-        args: [window.innerWidth / 2, window.innerHeight / 2, "up", pixels],
+        args: [uVp.w / 2, uVp.h / 2, "up", pixels],
       });
       return { success: true, result: `Scrolled up ${pixels}px` };
     }
@@ -621,7 +648,7 @@ async function executeToolInternal(
           el.scrollIntoView({ behavior: "smooth", block: "center" });
           return `Scrolled to: ${(el as HTMLElement).innerText?.slice(0, 60) || el.tagName}`;
         },
-        args: [selector, text],
+        args: [selector ?? null, text ?? null],
       });
       const msg = results[0]?.result;
       if (msg === "Element not found") return { success: false, error: msg };
