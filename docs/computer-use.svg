@@ -1,4 +1,4 @@
-<svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:24px auto;display:block;font-family:'Google Sans',sans-serif">
+<svg viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:24px auto;display:block;font-family:'Google Sans',sans-serif">
   <defs>
     <filter id="sc"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
     <marker id="ac" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#5F6368"/></marker>
