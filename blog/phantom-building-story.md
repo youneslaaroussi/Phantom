@@ -62,7 +62,7 @@ The whole project — Chrome extension, Cloud Run proxy, landing page, 8 persona
   <line x1="240" y1="140" x2="308" y2="160" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah)"/>
   <line x1="240" y1="194" x2="308" y2="180" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah)"/>
   <line x1="490" y1="165" x2="538" y2="165" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah)"/>
-  <line x1="538" y1="175" x2="490" y2="175" stroke="#4285F4" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="538" y1="175" x2="490" y2="175" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah)"/>
   <text x="514" y="158" text-anchor="middle" fill="#5F6368" font-size="9">WS</text>
   <!-- Memory box -->
   <rect x="310" y="270" width="180" height="50" rx="8" fill="#fff" stroke="#FBBC05" stroke-width="1.5" filter="url(#s1)"/>
