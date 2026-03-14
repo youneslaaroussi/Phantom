@@ -1,0 +1,68 @@
+<svg viewBox="0 -20 800 325" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:24px auto;display:block;font-family:'Google Sans',sans-serif">
+  <defs>
+    <filter id="st"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
+    <marker id="at" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#4285F4"/></marker>
+    <marker id="atg" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#34A853"/></marker>
+    <marker id="atr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#EA4335"/></marker>
+    <marker id="aty" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#FBBC05"/></marker>
+    <marker id="atgr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#5F6368"/></marker>
+  </defs>
+  <rect y="-20" width="800" height="325" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
+  <text x="400" y="8" text-anchor="middle" fill="#5F6368" font-size="11" font-weight="500">TOOL EXECUTION PIPELINE</text>
+
+  <!-- Gemini — lucide sparkles -->
+  <rect x="20" y="80" width="120" height="80" rx="12" fill="#34A853" filter="url(#st)"/>
+  <g transform="translate(73,90) scale(0.58)" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></g>
+  <text x="80" y="118" text-anchor="middle" fill="#fff" font-size="13" font-weight="500">Gemini Live</text>
+  <text x="80" y="134" text-anchor="middle" fill="#e6f4ea" font-size="10">toolCall msg</text>
+
+  <!-- WebSocket — lucide cable -->
+  <rect x="180" y="80" width="100" height="80" rx="12" fill="#fff" stroke="#e8eaed" stroke-width="1.5" filter="url(#st)"/>
+  <g transform="translate(223,90) scale(0.58)" stroke="#5F6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M17 19a1 1 0 0 1-1-1v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a1 1 0 0 1-1 1z"/><path d="M17 21v-2"/><path d="M19 14V6.5a1 1 0 0 0-7 0v11a1 1 0 0 1-7 0V10"/><path d="M21 21v-2"/><path d="M3 5V3"/><path d="M4 10a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2a2 2 0 0 1-2 2z"/><path d="M7 5V3"/></g>
+  <text x="230" y="118" text-anchor="middle" fill="#1f1f1f" font-size="12" font-weight="500">WS Proxy</text>
+  <text x="230" y="134" text-anchor="middle" fill="#5F6368" font-size="10">Cloud Run</text>
+
+  <!-- LiveSession — lucide radio -->
+  <rect x="320" y="80" width="120" height="80" rx="12" fill="#4285F4" filter="url(#st)"/>
+  <g transform="translate(373,90) scale(0.58)" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M16.247 7.761a6 6 0 0 1 0 8.478"/><path d="M19.075 4.933a10 10 0 0 1 0 14.134"/><path d="M4.925 19.067a10 10 0 0 1 0-14.134"/><path d="M7.753 16.239a6 6 0 0 1 0-8.478"/><circle cx="12" cy="12" r="2"/></g>
+  <text x="380" y="118" text-anchor="middle" fill="#fff" font-size="12" font-weight="500">LiveSession</text>
+  <text x="380" y="134" text-anchor="middle" fill="#d2e3fc" font-size="10">handleToolCalls</text>
+
+  <!-- executeTool — lucide wrench -->
+  <rect x="480" y="80" width="120" height="80" rx="12" fill="#FBBC05" filter="url(#st)"/>
+  <g transform="translate(533,90) scale(0.58)" stroke="#1f1f1f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></g>
+  <text x="540" y="118" text-anchor="middle" fill="#1f1f1f" font-size="12" font-weight="500">executeTool</text>
+  <text x="540" y="134" text-anchor="middle" fill="#5F6368" font-size="10">switch(name)</text>
+
+  <!-- Tool categories container -->
+  <rect x="628" y="34" width="164" height="210" rx="10" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="710" y="30" text-anchor="middle" fill="#5F6368" font-size="9" font-weight="500">20 BROWSER TOOLS</text>
+
+  <rect x="640" y="44" width="140" height="42" rx="8" fill="#fff" stroke="#4285F4" filter="url(#st)"/>
+  <text x="710" y="64" text-anchor="middle" fill="#4285F4" font-size="10" font-weight="500">Navigate</text>
+  <text x="710" y="78" text-anchor="middle" fill="#5F6368" font-size="9">openTab · switchTab · getTabs</text>
+
+  <rect x="640" y="94" width="140" height="42" rx="8" fill="#fff" stroke="#34A853" filter="url(#st)"/>
+  <text x="710" y="114" text-anchor="middle" fill="#34A853" font-size="10" font-weight="500">Perceive</text>
+  <text x="710" y="128" text-anchor="middle" fill="#5F6368" font-size="9">readPage · a11ySnap · find</text>
+
+  <rect x="640" y="144" width="140" height="42" rx="8" fill="#fff" stroke="#EA4335" filter="url(#st)"/>
+  <text x="710" y="164" text-anchor="middle" fill="#EA4335" font-size="10" font-weight="500">Act</text>
+  <text x="710" y="178" text-anchor="middle" fill="#5F6368" font-size="9">click · type · scroll · key</text>
+
+  <rect x="640" y="194" width="140" height="42" rx="8" fill="#fff" stroke="#FBBC05" filter="url(#st)"/>
+  <text x="710" y="214" text-anchor="middle" fill="#FBBC05" font-size="10" font-weight="500">AI Vision</text>
+  <text x="710" y="228" text-anchor="middle" fill="#5F6368" font-size="9">computerAction · contentAction</text>
+
+  <!-- Arrows forward -->
+  <line x1="140" y1="120" x2="178" y2="120" stroke="#5F6368" stroke-width="1.5" marker-end="url(#atgr)"/>
+  <line x1="280" y1="120" x2="318" y2="120" stroke="#5F6368" stroke-width="1.5" marker-end="url(#atgr)"/>
+  <line x1="440" y1="120" x2="478" y2="120" stroke="#5F6368" stroke-width="1.5" marker-end="url(#atgr)"/>
+  <line x1="600" y1="120" x2="626" y2="120" stroke="#5F6368" stroke-width="1.5" marker-end="url(#atgr)"/>
+
+  <!-- Return arrow (bottom, red) -->
+  <path d="M540,162 L540,255 L80,255 L80,162" fill="none" stroke="#EA4335" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#atr)"/>
+  <rect x="270" y="243" width="100" height="18" rx="4" fill="#fce8e6"/>
+  <text x="320" y="256" text-anchor="middle" fill="#EA4335" font-size="10" font-weight="500">toolResponse</text>
+
+</svg>

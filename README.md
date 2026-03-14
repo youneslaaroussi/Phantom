@@ -1,6 +1,8 @@
-# Phantom
-
 <div align="center">
+
+<img src="extension/assets/icon.png" alt="Phantom" width="128" />
+
+# Phantom
 
 **Talk to your browser. It listens.**
 
@@ -16,27 +18,206 @@ Voice-powered AI agent for Chrome — clicks, scrolls, reads, and navigates for 
 
 </div>
 
+<div align="center">
+<img src="media/phantom-demo.gif" alt="Phantom Demo" height="400" />
+<img src="media/phantom-computer-use.gif" alt="Computer Use Demo" height="400" />
+</div>
+
 ---
 
-## Architecture
+## Table of Contents
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Design Notes](#design-notes)
+  - [Architecture](#architecture)
+  - [Voice Interaction Loop](#voice-interaction-loop)
+  - [Tool Execution Pipeline](#tool-execution-pipeline)
+  - [Computer Use — AI Vision Clicking](#computer-use--ai-vision-clicking)
+  - [Memory System](#memory-system)
+  - [Privacy Shield](#privacy-shield)
+  - [Personas](#personas)
+  - [Tab Audio Streaming](#tab-audio-streaming)
+  - [Session Resumption](#session-resumption)
+- [Features](#features)
+- [Google Technology Stack](#google-technology-stack)
+- [Codebase Structure](#codebase-structure)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Overview
+
+Phantom is a voice-controlled AI agent that lives in your Chrome side panel. You talk to it, it talks back — and while you're having a conversation, it can see your screen, click buttons, fill forms, scroll pages, and navigate tabs on your behalf. It's powered by the Gemini Live API for real-time bidirectional audio streaming over WebSocket, with a Cloud Run proxy relaying messages between the extension and Google's servers.
+
+**Key capabilities:**
+- Real-time voice conversations with 30+ HD voices and affective dialog (reads your tone)
+- 20 browser automation tools — the agent clicks, types, scrolls, highlights, and navigates autonomously
+- Computer Use via Gemini 3 Flash vision model — AI looks at a screenshot and clicks at exact pixel coordinates
+- Live screen vision at 1fps — Phantom sees what you see and reacts to changes
+- Tab audio streaming — Phantom hears what you hear (videos, podcasts, music playing in the browser)
+- Persistent memory with local vector embeddings (all-MiniLM-L6-v2) — remembers you across sessions
+- Privacy shield that auto-blurs passwords, credit cards, and SSNs before any screenshot reaches the AI
+- 9 pixel-art personas, each with a unique voice, personality, and sprite animations
+
+---
+
+## Quick Start
+
+### 1. Install the extension
+
+Download from [Releases](https://github.com/youneslaaroussi/Phantom/releases/latest), unzip, load unpacked in `chrome://extensions`.
+
+### 2. Get a Gemini API key
+
+Free from [Google AI Studio](https://aistudio.google.com/apikey).
+
+### 3. Talk
+
+Open the side panel, pick a persona, tap the mic.
+
+<div align="center">
+<img src="media/phantom-quickstart.gif" alt="Quick Start Demo" height="300" />
+</div>
+
+---
+
+## Design Notes
+
+Phantom's architecture is split across two layers: a Chrome extension that handles voice capture, UI, tool execution, and browser automation; and a lightweight Cloud Run server that proxies WebSocket connections to Gemini and hosts sidecar AI endpoints for computer use and content actions.
+
+### Architecture
 
 <div align="center">
 <img src="docs/system-architecture.svg" alt="System Architecture" />
 </div>
 
-## Voice Interaction Loop
+The extension maintains a single persistent WebSocket connection through the proxy to the Gemini Live API. All communication — audio, text, tool calls, tool responses, vision frames, tab audio — flows through this one socket. The proxy is stateless; it relays messages verbatim and manages the GenAI SDK session object.
+
+### Voice Interaction Loop
 
 <div align="center">
 <img src="docs/voice-loop.svg" alt="Voice Interaction Loop" />
 </div>
 
-## Privacy Shield
+The voice loop is the core interaction cycle:
+
+1. **User speaks** — `AudioCapture` records PCM 16kHz mono from the microphone
+2. **Audio streams** — Raw PCM chunks are sent over WebSocket to the proxy, which relays them to Gemini
+3. **Gemini processes** — The model hears the user, thinks, and responds with audio + optional tool calls
+4. **Audio plays back** — Response audio streams back through the proxy and plays via `AudioPlayer`
+5. **Tools execute** — If Gemini requests tool calls, the extension executes them locally and sends results back
+6. **Gemini continues** — After receiving tool results, the model can speak again or call more tools
+
+The model handles turn-taking natively through voice activity detection. When the user starts speaking while the model is talking, the server sends an interruption signal and the audio queue clears.
+
+### Tool Execution Pipeline
+
+<div align="center">
+<img src="docs/tool-execution.svg" alt="Tool Execution Pipeline" />
+</div>
+
+Phantom exposes 20 browser tools to Gemini as function declarations. When the model decides to use a tool, it sends a `toolCall` message through the WebSocket. The extension's `LiveSession` client receives it, dispatches to `executeTool()`, and sends the result back as a `toolResponse`. Gemini then continues its turn — it may speak, call more tools, or finish.
+
+Tools are organized into categories:
+
+| Category | Tools | What They Do |
+|----------|-------|--------------|
+| **Navigate** | `openTab`, `switchTab`, `getTabs` | Tab management and navigation |
+| **Perceive** | `readPageContent`, `getAccessibilitySnapshot`, `findOnPage`, `getPageTitle` | Understand what's on the page |
+| **Act** | `clickOn`, `typeInto`, `pressKey`, `scrollDown`, `scrollUp`, `scrollTo`, `highlight` | Interact with page elements via CSS selectors |
+| **AI Vision** | `computerAction`, `contentAction` | Vision-based clicking and on-page AI popups |
+| **Memory** | `rememberThis`, `recallMemory`, `updateUserProfile` | Persistent memory across sessions |
+
+The agent is instructed to prefer `computerAction` (AI vision clicking) as its primary interaction tool, falling back to CSS selector-based tools for simple repetitive tasks where speed matters.
+
+### Computer Use — AI Vision Clicking
+
+<div align="center">
+<img src="docs/computer-use.svg" alt="Computer Use Pipeline" />
+</div>
+
+<div align="center">
+<img src="media/phantom-computer-use-detail.gif" alt="Computer Use in Action" height="300" />
+</div>
+
+Computer Use is a sidecar AI pipeline for coordinate-level clicking. When the voice model calls `computerAction("click the blue login button")`, the extension:
+
+1. **Captures a screenshot** of the active tab (JPEG, 60% quality, compressed)
+2. **Sends it to the Cloud Run server** along with the task description
+3. **Gemini 3 Flash** (vision model) analyzes the screenshot and returns an action plan: click at (x, y), type "hello", scroll down, etc.
+4. **Coordinates are rescaled** from the compressed image dimensions to a 1000x1000 grid, then to actual viewport pixels
+5. **Actions execute** on the page by dispatching real mouse/keyboard events via `chrome.scripting.executeScript`
+6. **An animated cursor** appears at the click target before the actual click, so the user can see what the agent is doing
+
+This works on everything — canvas elements, iframes, video players, complex UIs — because it operates on pixels, not DOM selectors.
+
+### Memory System
+
+<div align="center">
+<img src="docs/memory-system.svg" alt="Memory System" />
+</div>
+
+Phantom remembers you across sessions through three layers:
+
+**User Profile** — Durable facts stored via `updateUserProfile`: your name, preferences, and anything the agent learns about you. Injected into every system prompt.
+
+**Semantic Memories** — Facts stored via `rememberThis`. Each memory is embedded into a 384-dimensional vector using all-MiniLM-L6-v2 (running locally via Transformers.js WASM). When the agent calls `recallMemory`, the query is embedded and compared against all stored memories using cosine similarity, returning the most relevant matches.
+
+**Session Summaries** — When you disconnect, the full conversation transcript is summarized by Gemini 2.5 Flash and stored. On next connect, recent session summaries are injected into the system prompt so the agent has continuity.
+
+All memory lives in Chrome's local storage. Nothing leaves your device.
+
+### Privacy Shield
 
 Sensitive content is automatically blurred before any screenshot reaches the AI.
 
 <div align="center">
 <img src="docs/privacy-pipeline.svg" alt="Privacy Shield Pipeline" />
 </div>
+
+Before every vision frame capture, the privacy shield:
+
+1. **Scans the DOM** for sensitive elements — password fields, credit card inputs, elements containing SSN/API key patterns
+2. **Applies CSS blur** (`filter: blur(8px)`) to matched elements
+3. **Captures the screenshot** — sensitive content is already blurred in the image
+4. **Removes the blur** — restores original styles so the user sees no change
+
+The entire pipeline runs in ~30ms per frame. Detection uses both CSS selectors (input types, autocomplete attributes) and regex patterns for text content (credit card numbers, SSNs, API keys, bearer tokens).
+
+### Personas
+
+Phantom ships with 9 personas, each with a unique Gemini voice, system prompt personality, and pixel-art sprite animations (idle, listening, talking, thinking states):
+
+<div align="center">
+<img src="media/phantom-personas.gif" alt="Personas" height="300" />
+</div>
+
+Personas are defined in `extension/lib/personas.ts`. Switching personas disconnects and reconnects with a new system prompt and voice. The animated mascot in the UI reflects the current state — sleeping when disconnected, listening when the mic is on, talking when the agent speaks, and thinking when a tool is executing.
+
+### Tab Audio Streaming
+
+Phantom can hear what's playing in your browser tab — videos, podcasts, music, anything with audio output. When tab audio is enabled:
+
+1. The extension requests a `tabCapture` media stream ID from the background service worker
+2. A `ScriptProcessor` in the page context captures raw PCM audio at 16kHz
+3. Audio chunks are sent over the WebSocket alongside mic audio (mixed if both are active)
+4. The model receives both streams and can respond to what it hears
+
+Tab audio automatically follows tab switches — when you change tabs, the capture stops on the old tab and restarts on the new one.
+
+### Session Resumption
+
+Gemini Live API connections have a time limit. When the server sends a `GoAway` message or the WebSocket drops unexpectedly, Phantom auto-reconnects:
+
+1. Each session receives a **resumption handle** from the server
+2. On unexpected disconnect (close code != 1000), Phantom waits 2 seconds and reconnects
+3. The resumption handle is sent in the new `setup` message, allowing Gemini to restore conversation state
+4. The user experiences a brief pause but no data loss
+
+---
 
 ## Features
 
@@ -55,7 +236,9 @@ Sensitive content is automatically blurred before any screenshot reaches the AI.
 | **Context compression** | Sliding window for longer sessions |
 | **Affective dialog** | Model reads tone and emotion from your voice |
 
-## 🧩 Google Technology Stack
+---
+
+## Google Technology Stack
 
 | Technology | Usage | Where |
 |---|---|---|
@@ -71,7 +254,7 @@ Sensitive content is automatically blurred before any screenshot reaches the AI.
 | **Google Cloud Run** | Hosts WebSocket proxy server, auto-scaling | Server deployment |
 | **Google Fonts** | Google Sans / Google Sans Text typography | Extension + Website |
 
-### 🔌 Chrome Extension APIs
+### Chrome Extension APIs
 
 | API | Usage |
 |---|---|
@@ -85,7 +268,7 @@ Sensitive content is automatically blurred before any screenshot reaches the AI.
 | `host_permissions` | `<all_urls>` for script injection on any page |
 | `Manifest V3` | Modern extension platform with service worker |
 
-### 🌐 Chrome Web Platform APIs
+### Chrome Web Platform APIs
 
 | API | Usage |
 |---|---|
@@ -97,19 +280,85 @@ Sensitive content is automatically blurred before any screenshot reaches the AI.
 | `CSS Animations` | Page-injected effects (iris, EQ bars, sparkles, shatter fragments) |
 | `WASM` | Local embedding model (all-MiniLM-L6-v2) via Transformers.js |
 
-## Quick Start
+---
 
-### 1. Install the extension
+## Codebase Structure
 
-Download from [Releases](https://github.com/youneslaaroussi/Phantom/releases/latest), unzip, load unpacked in `chrome://extensions`.
+```
+phantom/
+├── extension/                  # Chrome extension (Plasmo + React)
+│   ├── popup.tsx               # Side panel entry point
+│   ├── background.ts           # Service worker, tab audio stream IDs
+│   ├── components/
+│   │   ├── voice-screen.tsx    # Main voice UI — mic, mascot, tool status
+│   │   ├── animated-mascot.tsx # Pixel-art mascot with frame animation
+│   │   ├── wave-visualizer.tsx # WebGL audio waveform
+│   │   ├── settings-screen.tsx # API key, voice, persona settings
+│   │   ├── setup-screen.tsx    # First-run onboarding
+│   │   ├── trace-viewer.tsx    # Debug trace panel
+│   │   ├── markdown.tsx        # Markdown renderer for transcripts
+│   │   └── toast.tsx           # Toast notifications
+│   ├── lib/
+│   │   ├── session.tsx         # Session provider — orchestrates everything
+│   │   ├── tools.ts            # 20 tool declarations + executeTool()
+│   │   ├── computer-use.ts     # Vision-based AI clicking pipeline
+│   │   ├── content-actions.ts  # On-page AI popups (summarize, rewrite)
+│   │   ├── tab-audio.ts        # Tab audio capture + tab-switch handling
+│   │   ├── vision.ts           # Screen capture at 1fps
+│   │   ├── spotlight.ts        # Cursor context streaming
+│   │   ├── personas.ts         # 9 persona definitions
+│   │   ├── sounds.ts           # UI sound effects
+│   │   ├── context.ts          # Session context builder
+│   │   ├── live/
+│   │   │   ├── client.ts       # WebSocket client, message handling
+│   │   │   ├── audio.ts        # AudioCapture + AudioPlayer
+│   │   │   └── types.ts        # All protocol types
+│   │   ├── memory/
+│   │   │   ├── index.ts        # Memory context builder
+│   │   │   ├── store.ts        # Chrome storage operations
+│   │   │   ├── embeddings.ts   # Transformers.js all-MiniLM-L6-v2
+│   │   │   └── session-summary.ts # Session summarization
+│   │   ├── privacy/
+│   │   │   ├── index.ts        # Privacy shield orchestrator
+│   │   │   ├── dom-scanner.ts  # DOM element scanner
+│   │   │   ├── patterns.ts     # Regex patterns (SSN, CC, API keys)
+│   │   │   ├── selectors.ts    # CSS selectors for sensitive inputs
+│   │   │   ├── blur.ts         # Apply/remove CSS blur
+│   │   │   └── shield.ts       # Shield pipeline
+│   │   └── effects/
+│   │       ├── launch-ripple.ts   # WebGL ripple effect
+│   │       ├── launch-vortex.ts   # WebGL vortex effect
+│   │       ├── launch-shatter.ts  # Shatter animation
+│   │       ├── audio-eq.ts        # Audio EQ bars
+│   │       └── vision-iris.ts     # Vision activation iris
+│   └── assets/                 # Icons, spritesheets, sound effects
+│
+├── server/                     # Cloud Run proxy server
+│   └── src/
+│       ├── index.ts            # HTTP server + WebSocket upgrade
+│       ├── proxy.ts            # Gemini Live API WebSocket relay
+│       ├── computer-use.ts     # Computer Use endpoint (Gemini 3 Flash)
+│       ├── content-actions.ts  # Content action endpoint
+│       └── summarize.ts        # Session summarization endpoint
+│
+├── blog/                       # Building story articles
+├── docs/                       # Architecture diagrams (SVG)
+└── scripts/                    # Asset generation (mascots, sprites, SFX)
+```
 
-### 2. Get a Gemini API key
+### Key Files
 
-Free from [Google AI Studio](https://aistudio.google.com/apikey).
+**Session Provider (`extension/lib/session.tsx`)** — The central orchestrator. Creates the `LiveSession`, wires up all callbacks (tool execution, transcripts, vision, tab audio, spotlight), manages connection lifecycle, and exposes everything via React context.
 
-### 3. Talk
+**LiveSession Client (`extension/lib/live/client.ts`)** — The WebSocket client. Handles the Gemini Live API protocol: setup messages, audio streaming, tool call dispatch, tool response sending, session resumption, and interruption handling.
 
-Open the side panel, pick a persona, tap the mic.
+**Tool Executor (`extension/lib/tools.ts`)** — 20 tool declarations as Gemini function schemas, plus a giant `switch` statement that executes each tool via Chrome extension APIs (`chrome.tabs`, `chrome.scripting.executeScript`).
+
+**Computer Use (`extension/lib/computer-use.ts`)** — The vision-based clicking pipeline. Captures screenshots, sends them to the server for Gemini 3 Flash analysis, rescales coordinates, and dispatches real mouse/keyboard events on the page.
+
+**WebSocket Proxy (`server/src/proxy.ts`)** — Stateless relay between the extension and the Gemini Live API. Routes setup, audio, text, tool responses, and streams server messages back verbatim.
+
+---
 
 ## Development
 
@@ -122,15 +371,50 @@ cd extension && pnpm install && pnpm dev
 cd server && npm install && GEMINI_API_KEY=AIza... npm run dev
 ```
 
-## Packages
+---
 
-| Package | Description |
-|---------|-------------|
-| [`extension/`](./extension/) | Chrome extension — voice UI, browser tools, vision, memory |
-| [`server/`](./server/) | Cloud Run proxy — WebSocket relay, content actions, computer use |
-| [`blog/`](./blog/) | Building story article |
-| [`docs/`](./docs/) | Architecture diagrams (SVG) |
-| [`scripts/`](./scripts/) | Asset generation (mascots, sprites, SFX) |
+## Contributing
+
+Contributions welcome! Here's how to get started.
+
+### Adding a New Tool
+
+1. Add the function declaration to `getToolDeclarations()` in `extension/lib/tools.ts`
+2. Add the execution case to `executeToolInternal()` in the same file
+3. Add a label to `TOOL_LABELS` in `extension/components/voice-screen.tsx`
+4. Optionally add tool guidelines to `TOOL_GUIDELINES` in `extension/lib/session.tsx`
+
+### Adding a New Persona
+
+1. Add the persona definition to `PERSONAS` in `extension/lib/personas.ts`
+2. Add a pixel-art sprite PNG to `extension/assets/`
+3. The persona needs: `id`, `name`, `voice` (Gemini voice name), `prompt` (system prompt personality), and `image` (sprite filename)
+
+### Adding a New Page Effect
+
+1. Create a new effect in `extension/lib/effects/`
+2. Register it in `extension/lib/page-effects.ts`
+3. Effects are injected into pages via `chrome.scripting.executeScript` — they must be self-contained functions
+
+### Areas for Contribution
+
+**High Priority:**
+- More browser tools (form auto-fill, table extraction, PDF reading)
+- Improved computer use accuracy (multi-step action chains, verification loops)
+- Better error recovery when tools fail mid-chain
+
+**Medium Priority:**
+- Additional personas with unique capabilities
+- UI polish (settings, onboarding, trace viewer)
+- More page effects and animations
+- Accessibility improvements
+
+**Experimental:**
+- On-device inference via Chrome's Prompt API (hybrid cloud + local)
+- Multi-tab orchestration (agent controls multiple tabs simultaneously)
+- Webhook integrations (trigger actions from external events)
+
+---
 
 ## License
 

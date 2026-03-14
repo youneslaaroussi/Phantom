@@ -1,0 +1,90 @@
+<svg viewBox="0 0 800 340" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:24px auto;display:block;font-family:'Google Sans',sans-serif">
+  <defs>
+    <filter id="sm"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
+    <marker id="am" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#5F6368"/></marker>
+    <marker id="amb" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#4285F4"/></marker>
+  </defs>
+  <rect width="800" height="340" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
+  <text x="400" y="24" text-anchor="middle" fill="#5F6368" font-size="11" font-weight="500">MEMORY SYSTEM</text>
+
+  <!-- Store row -->
+  <text x="30" y="60" fill="#4285F4" font-size="10" font-weight="700" letter-spacing="1">STORE</text>
+
+  <!-- rememberThis — lucide bookmark -->
+  <rect x="20" y="70" width="130" height="70" rx="8" fill="#4285F4" filter="url(#sm)"/>
+  <g transform="translate(78,75) scale(0.58)" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"/></g>
+  <text x="85" y="104" text-anchor="middle" fill="#fff" font-size="11" font-weight="500">rememberThis</text>
+  <text x="85" y="118" text-anchor="middle" fill="#d2e3fc" font-size="9">"likes dark mode"</text>
+
+  <!-- Embed Text — lucide layers -->
+  <rect x="180" y="70" width="130" height="70" rx="8" fill="#fff" stroke="#A142F4" filter="url(#sm)"/>
+  <g transform="translate(238,75) scale(0.58)" stroke="#A142F4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></g>
+  <text x="245" y="104" text-anchor="middle" fill="#A142F4" font-size="11" font-weight="500">Embed Text</text>
+  <text x="245" y="118" text-anchor="middle" fill="#5F6368" font-size="9">all-MiniLM-L6-v2</text>
+
+  <!-- Chrome Storage — lucide database -->
+  <rect x="340" y="70" width="130" height="70" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#sm)"/>
+  <g transform="translate(398,75) scale(0.58)" stroke="#5F6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></g>
+  <text x="405" y="104" text-anchor="middle" fill="#1f1f1f" font-size="11" font-weight="500">Chrome Storage</text>
+  <text x="405" y="118" text-anchor="middle" fill="#5F6368" font-size="9">text + 384D vector</text>
+
+  <!-- User Profile — lucide user -->
+  <rect x="510" y="70" width="120" height="70" rx="8" fill="#EA4335" filter="url(#sm)"/>
+  <g transform="translate(563,75) scale(0.58)" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g>
+  <text x="570" y="104" text-anchor="middle" fill="#fff" font-size="11" font-weight="500">User Profile</text>
+  <text x="570" y="118" text-anchor="middle" fill="#fce8e6" font-size="9">name · prefs</text>
+
+  <!-- Session Summary — lucide clock -->
+  <rect x="660" y="70" width="120" height="70" rx="8" fill="#34A853" filter="url(#sm)"/>
+  <g transform="translate(713,75) scale(0.58)" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g>
+  <text x="720" y="104" text-anchor="middle" fill="#fff" font-size="11" font-weight="500">Session Summary</text>
+  <text x="720" y="118" text-anchor="middle" fill="#e6f4ea" font-size="9">on disconnect</text>
+
+  <!-- Store arrows -->
+  <line x1="150" y1="105" x2="178" y2="105" stroke="#5F6368" stroke-width="1.5" marker-end="url(#am)"/>
+  <line x1="310" y1="105" x2="338" y2="105" stroke="#5F6368" stroke-width="1.5" marker-end="url(#am)"/>
+
+  <!-- Recall row -->
+  <text x="30" y="172" fill="#FBBC05" font-size="10" font-weight="700" letter-spacing="1">RECALL</text>
+
+  <!-- recallMemory — lucide search -->
+  <rect x="20" y="182" width="130" height="70" rx="8" fill="#FBBC05" filter="url(#sm)"/>
+  <g transform="translate(78,187) scale(0.58)" stroke="#1f1f1f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></g>
+  <text x="85" y="216" text-anchor="middle" fill="#1f1f1f" font-size="11" font-weight="500">recallMemory</text>
+  <text x="85" y="230" text-anchor="middle" fill="#5F6368" font-size="9">"dark mode setting?"</text>
+
+  <!-- Embed Query — lucide layers -->
+  <rect x="180" y="182" width="130" height="70" rx="8" fill="#fff" stroke="#A142F4" filter="url(#sm)"/>
+  <g transform="translate(238,187) scale(0.58)" stroke="#A142F4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></g>
+  <text x="245" y="216" text-anchor="middle" fill="#A142F4" font-size="11" font-weight="500">Embed Query</text>
+  <text x="245" y="230" text-anchor="middle" fill="#5F6368" font-size="9">384D vector</text>
+
+  <!-- Cosine Similarity — lucide bar-chart-3 -->
+  <rect x="340" y="182" width="130" height="70" rx="8" fill="#fff" stroke="#A142F4" filter="url(#sm)"/>
+  <g transform="translate(398,187) scale(0.58)" stroke="#A142F4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></g>
+  <text x="405" y="216" text-anchor="middle" fill="#A142F4" font-size="11" font-weight="500">Cosine Similarity</text>
+  <text x="405" y="230" text-anchor="middle" fill="#5F6368" font-size="9">rank all memories</text>
+
+  <!-- Top Matches — lucide list-checks -->
+  <rect x="510" y="182" width="130" height="70" rx="8" fill="#fff" stroke="#34A853" filter="url(#sm)"/>
+  <g transform="translate(568,187) scale(0.58)" stroke="#34A853" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></g>
+  <text x="575" y="216" text-anchor="middle" fill="#34A853" font-size="11" font-weight="500">Top Matches</text>
+  <text x="575" y="230" text-anchor="middle" fill="#5F6368" font-size="9">relevant results</text>
+
+  <!-- Recall arrows -->
+  <line x1="150" y1="217" x2="178" y2="217" stroke="#5F6368" stroke-width="1.5" marker-end="url(#am)"/>
+  <line x1="310" y1="217" x2="338" y2="217" stroke="#5F6368" stroke-width="1.5" marker-end="url(#am)"/>
+  <line x1="470" y1="217" x2="508" y2="217" stroke="#5F6368" stroke-width="1.5" marker-end="url(#am)"/>
+
+  <!-- Inject into prompt -->
+  <rect x="170" y="282" width="460" height="28" rx="8" fill="#e8f0fe" stroke="#4285F4" stroke-width="0.5"/>
+  <text x="400" y="301" text-anchor="middle" fill="#4285F4" font-size="10" font-weight="500">Profile + Memories + Session History → injected into system prompt at connect</text>
+
+  <!-- Lines down to inject — routed right of Recall row cards to avoid overlap -->
+  <!-- Chrome Storage → inject (drop to top edge of box) -->
+  <path d="M470,113 L480,113 Q488,113 488,121 L488,282" fill="none" stroke="#4285F4" stroke-width="1" stroke-dasharray="4,3"/>
+  <!-- User Profile → inject right edge -->
+  <path d="M570,140 L570,155 Q570,163 578,163 L660,163 Q668,163 668,171 L668,288 Q668,296 660,296 L630,296" fill="none" stroke="#4285F4" stroke-width="1" stroke-dasharray="4,3"/>
+  <!-- Session Summary → inject right edge -->
+  <path d="M720,140 L720,155 Q720,163 728,163 L778,163 Q786,163 786,171 L786,288 Q786,296 778,296 L630,296" fill="none" stroke="#4285F4" stroke-width="1" stroke-dasharray="4,3"/>
+</svg>
