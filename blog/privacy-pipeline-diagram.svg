@@ -1,0 +1,30 @@
+<svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:24px auto;display:block;font-family:'Google Sans',system-ui,sans-serif">
+  <defs>
+    <filter id="s2"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
+    <marker id="ah2" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#5F6368"/></marker>
+  </defs>
+  <rect width="800" height="200" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
+  <text x="400" y="28" text-anchor="middle" fill="#5F6368" font-size="11" font-weight="500">PRIVACY SHIELD PIPELINE (~30ms per frame)</text>
+  <rect x="20" y="50" width="130" height="60" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#s2)"/>
+  <text x="85" y="76" text-anchor="middle" fill="#1f1f1f" font-size="11" font-weight="500">DOM Scan</text>
+  <text x="85" y="94" text-anchor="middle" fill="#5F6368" font-size="10">Inputs + Text</text>
+  <rect x="180" y="50" width="130" height="60" rx="8" fill="#fff" stroke="#EA4335" filter="url(#s2)"/>
+  <text x="245" y="76" text-anchor="middle" fill="#EA4335" font-size="11" font-weight="500">Apply Blur</text>
+  <text x="245" y="94" text-anchor="middle" fill="#5F6368" font-size="10">CSS filter:blur(8px)</text>
+  <rect x="340" y="50" width="130" height="60" rx="8" fill="#fff" stroke="#4285F4" filter="url(#s2)"/>
+  <text x="405" y="76" text-anchor="middle" fill="#4285F4" font-size="11" font-weight="500">Capture Tab</text>
+  <text x="405" y="94" text-anchor="middle" fill="#5F6368" font-size="10">JPEG Quality 50</text>
+  <rect x="500" y="50" width="130" height="60" rx="8" fill="#fff" stroke="#34A853" filter="url(#s2)"/>
+  <text x="565" y="76" text-anchor="middle" fill="#34A853" font-size="11" font-weight="500">Remove Blur</text>
+  <text x="565" y="94" text-anchor="middle" fill="#5F6368" font-size="10">Restore styles</text>
+  <rect x="660" y="50" width="120" height="60" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#s2)"/>
+  <text x="720" y="76" text-anchor="middle" fill="#1f1f1f" font-size="11" font-weight="500">Send to AI</text>
+  <text x="720" y="94" text-anchor="middle" fill="#5F6368" font-size="10">Secrets blurred</text>
+  <line x1="150" y1="80" x2="178" y2="80" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <line x1="310" y1="80" x2="338" y2="80" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <line x1="470" y1="80" x2="498" y2="80" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <line x1="630" y1="80" x2="658" y2="80" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <rect x="20" y="130" width="760" height="50" rx="8" fill="#fce8e6" stroke="#EA4335" stroke-width="0.5"/>
+  <text x="400" y="152" text-anchor="middle" fill="#EA4335" font-size="11" font-weight="500">9 PII Categories Detected: Passwords · Credit Cards · SSNs · Google/OpenAI/AWS Keys · Bearer Tokens · Private Keys</text>
+  <text x="400" y="170" text-anchor="middle" fill="#5F6368" font-size="10">Regex + DOM selectors + aria-label + login form detection · 47 tests passing · &lt;5ms per frame</text>
+</svg>
