@@ -54,9 +54,25 @@
     },
     "web_accessible_resources": [
       {
-        "resources": ["assets/*", "assets/**/*"],
-        "matches": ["<all_urls>"]
+        "resources": [
+          "assets/*",
+          "assets/**/*"
+        ],
+        "matches": [
+          "<all_urls>"
+        ]
       }
+    ]
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
+      "esbuild",
+      "lmdb",
+      "msgpackr-extract",
+      "protobufjs",
+      "sharp"
     ]
   }
 }
