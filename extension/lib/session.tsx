@@ -196,11 +196,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       sessionToolCallsRef.current = [];
     }
 
-    // Build memory context to inject into system prompt
     let memoryContext = "";
     try {
       memoryContext = await buildMemoryContext();
+      if (memoryContext) {
+        addTrace("system", `Memory context injected (${memoryContext.length} chars)`);
+      }
     } catch (err) {
+      addTrace("system", `Memory context failed: ${err}`);
       console.warn("[Phantom] Failed to build memory context:", err);
     }
 
@@ -305,6 +308,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const disconnect = useCallback(() => {
     playDisconnect();
     addTrace("system", "Disconnected");
+
+    const transcript = sessionTranscriptRef.current.join("\n");
+    const toolCalls = [...sessionToolCallsRef.current];
+    if (transcript.length > 20) {
+      addTrace("system", "Summarizing session...");
+      summarizeSession(transcript, toolCalls)
+        .then(() => addTrace("system", "Session summary stored"))
+        .catch((err) => {
+          addTrace("system", `Session summary failed: ${err}`);
+          console.warn("[Phantom] Session summary failed:", err);
+        });
+    }
+
     endTrace();
     stopEvents();
     stopVision();
@@ -313,15 +329,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setTabAudioEnabledState(false);
     setSpotlightEnabledState(false);
     setPausedState(false);
-
-    // Summarize session before cleanup (fire and forget)
-    const transcript = sessionTranscriptRef.current.join("\n");
-    const toolCalls = [...sessionToolCallsRef.current];
-    if (transcript.length > 20) {
-      summarizeSession(transcript, toolCalls).catch((err) =>
-        console.warn("[Phantom] Session summary failed:", err)
-      );
-    }
 
     sessionRef.current?.disconnect();
     sessionRef.current = null;

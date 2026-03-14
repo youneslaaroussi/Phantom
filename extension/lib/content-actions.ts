@@ -34,13 +34,27 @@ export async function executeContentAction(
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return { success: false, error: "No active tab" };
 
-  // 1. Get the text content from the element
   const textResults = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: (sel: string) => {
-      const el = document.querySelector(sel) as HTMLElement | null;
+      let el = document.querySelector(sel) as HTMLElement | null;
+      if (!el) {
+        var candidates = ["article", "main", "[role='main']"];
+        for (var i = 0; i < candidates.length; i++) {
+          var c = document.querySelector(candidates[i]) as HTMLElement | null;
+          if (c && (c.innerText || "").trim().length > 50) { el = c; break; }
+        }
+      }
       if (!el) return null;
-      return el.innerText || el.textContent || "";
+      var clone = el.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll("script, style, nav, header, footer, iframe").forEach(function(n) { n.remove(); });
+      document.body.appendChild(clone);
+      clone.style.position = "absolute";
+      clone.style.left = "-9999px";
+      clone.style.visibility = "hidden";
+      var text = (clone.innerText || clone.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+      clone.remove();
+      return text.slice(0, 6000);
     },
     args: [selector],
   });
@@ -103,25 +117,26 @@ function showContentPopup(
   const el = document.querySelector(selector) as HTMLElement | null;
   if (!el) return;
 
-  // Scroll to and highlight
+  var existingPopups = document.querySelectorAll(".phantom-content-popup");
+  var stackOffset = existingPopups.length * 60;
+
   el.scrollIntoView({ behavior: "smooth", block: "center" });
   const prevOutline = el.style.outline;
   const prevBg = el.style.backgroundColor;
-  el.style.outline = "2px solid #a78bfa";
+  el.style.outline = "2px solid #4285F4";
   el.style.outlineOffset = "3px";
-  el.style.backgroundColor = "rgba(167, 139, 250, 0.08)";
+  el.style.backgroundColor = "rgba(66, 133, 244, 0.06)";
   el.style.transition = "outline 0.3s, background-color 0.3s";
 
-  // Create popup
   const popup = document.createElement("div");
-  popup.id = "phantom-content-popup";
+  popup.className = "phantom-content-popup";
 
   const actionLabels: Record<string, string> = {
-    summarize: "📝 Summary",
-    rewrite: "✏️ Rewrite",
-    explain: "💡 Explanation",
-    translate: "🌐 Translation",
-    simplify: "🎯 Simplified",
+    summarize: "Summary",
+    rewrite: "Rewrite",
+    explain: "Explanation",
+    translate: "Translation",
+    simplify: "Simplified",
   };
 
   const label = actionLabels[action] || action;
@@ -129,60 +144,77 @@ function showContentPopup(
   popup.innerHTML = `
     <div style="
       position: fixed;
-      bottom: 20px;
+      bottom: ${20 + stackOffset}px;
       right: 20px;
       max-width: 400px;
-      max-height: 300px;
-      background: #1a1a2e;
-      border: 1px solid #a78bfa;
-      border-radius: 12px;
-      padding: 16px;
+      max-height: 340px;
+      background: #ffffff;
+      border: 1px solid #e8eaed;
+      border-radius: 16px;
+      padding: 0;
       z-index: 2147483647;
-      box-shadow: 0 8px 32px rgba(167, 139, 250, 0.3);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      color: #e2e8f0;
-      overflow-y: auto;
-      animation: phantomSlideIn 0.3s ease-out;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.08);
+      font-family: 'Google Sans Text', 'Google Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: #1f1f1f;
+      overflow: hidden;
+      animation: phantomSlideIn 0.25s cubic-bezier(0.2, 0, 0, 1);
     ">
       <style>
         @keyframes phantomSlideIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: translateY(12px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        .phantom-content-popup *::-webkit-scrollbar { width: 4px; }
+        .phantom-content-popup *::-webkit-scrollbar-track { background: transparent; }
+        .phantom-content-popup *::-webkit-scrollbar-thumb { background: #c4c7c5; border-radius: 4px; }
       </style>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div style="font-size: 13px; font-weight: 600; color: #a78bfa;">${label}</div>
-        <button id="phantom-popup-close" style="
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid #f1f3f4;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0;">
+            <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" fill="#4285F4"/>
+            <path d="M18 14L18.62 17.38L22 18L18.62 18.62L18 22L17.38 18.62L14 18L17.38 17.38L18 14Z" fill="#34A853"/>
+            <path d="M5 14L5.62 17.38L9 18L5.62 18.62L5 22L4.38 18.62L1 18L4.38 17.38L5 14Z" fill="#FBBC05"/>
+          </svg>
+          <span style="font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif; font-size: 14px; font-weight: 500; color: #1f1f1f;">${label}</span>
+        </div>
+        <button class="phantom-popup-close" style="
           background: transparent;
           border: none;
-          color: #64748b;
+          color: #747775;
           cursor: pointer;
-          font-size: 18px;
-          padding: 0 4px;
+          font-size: 20px;
+          padding: 0;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          transition: background 0.15s;
           line-height: 1;
-        ">×</button>
+        " onmouseover="this.style.background='#f1f3f4'" onmouseout="this.style.background='transparent'">&times;</button>
       </div>
-      <div style="font-size: 13px; line-height: 1.6; color: #cbd5e1; white-space: pre-wrap;">${result}</div>
+      <div style="padding: 12px 16px 16px; max-height: 260px; overflow-y: auto; font-size: 13px; line-height: 1.7; color: #444746; white-space: pre-wrap;">${result}</div>
     </div>
   `;
 
   document.body.appendChild(popup);
 
-  // Close button
-  const closeBtn = document.getElementById("phantom-popup-close");
+  var closeBtn = popup.querySelector(".phantom-popup-close");
   if (closeBtn) {
-    closeBtn.addEventListener("click", () => {
+    closeBtn.addEventListener("click", function() {
       popup.remove();
       el.style.outline = prevOutline;
       el.style.backgroundColor = prevBg;
     });
   }
 
-  // Auto-dismiss after 30s
-  setTimeout(() => {
-    popup.remove();
-    el.style.outline = prevOutline;
-    el.style.backgroundColor = prevBg;
+  setTimeout(function() {
+    if (popup.parentNode) {
+      popup.remove();
+      el.style.outline = prevOutline;
+      el.style.backgroundColor = prevBg;
+    }
   }, 30000);
 }
 
@@ -203,16 +235,16 @@ export async function highlightContent(
       if (!el) return;
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       const prev = el.style.cssText;
-      el.style.outline = "3px solid #a78bfa";
+      el.style.outline = "2px solid #4285F4";
       el.style.outlineOffset = "2px";
-      el.style.backgroundColor = "rgba(167, 139, 250, 0.1)";
+      el.style.backgroundColor = "rgba(66, 133, 244, 0.06)";
       el.style.transition = "all 0.3s";
 
       if (lbl) {
         const tag = document.createElement("div");
         tag.textContent = lbl;
         tag.style.cssText =
-          "position:absolute;z-index:999999;background:#a78bfa;color:#000;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;";
+          "position:absolute;z-index:999999;background:#4285F4;color:#fff;font-family:'Google Sans','Segoe UI',system-ui,sans-serif;font-size:11px;font-weight:500;padding:2px 10px;border-radius:100px;pointer-events:none;white-space:nowrap;";
         const rect = el.getBoundingClientRect();
         tag.style.top = window.scrollY + rect.top - 24 + "px";
         tag.style.left = window.scrollX + rect.left + "px";

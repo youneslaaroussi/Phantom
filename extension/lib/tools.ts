@@ -254,7 +254,7 @@ export async function executeTool(
     if (result.success) {
       return { result: result.result || "ok" };
     }
-    return { error: result.error || "Tool failed" };
+    return { error: result.error || "Tool execution failed" };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Unknown error" };
   }

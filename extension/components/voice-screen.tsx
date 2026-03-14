@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Mic, Square, Settings, Eye, EyeOff, Terminal, Volume2, VolumeX, Send, MousePointer2, X, Pause, Play, Code2, Shield } from "lucide-react";
+import { Mic, Square, Settings, Eye, EyeOff, Terminal, Volume2, VolumeX, Send, MousePointer2, X, Pause, Play, Code2, Shield, Brain } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
 import { MarkdownText } from "./markdown";
@@ -14,6 +14,7 @@ interface VoiceScreenProps {
   onOpenSettings: () => void;
   onOpenTraces: () => void;
   onOpenDom: () => void;
+  onOpenMemory: () => void;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -42,7 +43,7 @@ function humanizeToolName(name: string): string {
   return TOOL_LABELS[name] || name.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
 }
 
-export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom }: VoiceScreenProps) => {
+export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom, onOpenMemory }: VoiceScreenProps) => {
   const {
     state,
     connect,
@@ -227,6 +228,15 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom }: VoiceSc
               </button>
             </Tooltip>
           )}
+          <Tooltip text="Memory">
+            <button
+              onClick={onOpenMemory}
+              className="p-2 rounded-full transition-colors hover:bg-g-surface-container"
+              style={{ color: "var(--g-outline)" }}
+            >
+              <Brain className="w-[18px] h-[18px]" />
+            </button>
+          </Tooltip>
           <Tooltip text="DOM">
             <button
               onClick={onOpenDom}

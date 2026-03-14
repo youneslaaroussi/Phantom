@@ -5,10 +5,11 @@ import { SettingsScreen } from "./components/settings-screen";
 import { SetupScreen } from "./components/setup-screen";
 import { TraceViewer } from "./components/trace-viewer";
 import { DomInspector } from "./components/dom-inspector";
+import { MemoryScreen } from "./components/memory-screen";
 import { ToastProvider } from "./components/toast";
 import "./style.css";
 
-type Screen = "voice" | "settings" | "setup" | "loading" | "traces" | "dom";
+type Screen = "voice" | "settings" | "setup" | "loading" | "traces" | "dom" | "memory";
 
 const SETUP_DONE_KEY = "phantom_setup_done";
 
@@ -46,7 +47,11 @@ const App = () => {
     return <DomInspector onBack={() => setScreen("voice")} />;
   }
 
-  return <VoiceScreen onOpenSettings={() => setScreen("settings")} onOpenTraces={() => setScreen("traces")} onOpenDom={() => setScreen("dom")} />;
+  if (screen === "memory") {
+    return <MemoryScreen onBack={() => setScreen("voice")} />;
+  }
+
+  return <VoiceScreen onOpenSettings={() => setScreen("settings")} onOpenTraces={() => setScreen("traces")} onOpenDom={() => setScreen("dom")} onOpenMemory={() => setScreen("memory")} />;
 };
 
 const SidePanel = () => {
