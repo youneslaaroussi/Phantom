@@ -29,6 +29,7 @@ import { playConnect, playDisconnect, playToolStart, playToolEnd, playError, pla
 import { getSavedPersonaId, savePersonaId, getPersona, type Persona } from "./personas";
 import type { LiveSessionState, LiveVoiceName } from "./live/types";
 import { buildMemoryContext, summarizeSession } from "./memory/index";
+import { playPageLaunchEffect, playPageSparkleEffect } from "./page-effects";
 
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 
@@ -120,6 +121,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setTabAudioEnabledState(enabled);
     if (enabled && sessionRef.current?.isConnected()) {
       addTrace("system", "Tab audio capture started");
+      playPageSparkleEffect("#c084fc").catch(() => {}); // Purple sparkles
       try {
         await startTabAudio((base64) => {
           sessionRef.current?.sendAudioBase64(base64);
@@ -231,6 +233,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       addTrace("system", "Connected");
       playConnect();
       toast("success", "Connected");
+      // Immersive launch effect on the actual page
+      playPageLaunchEffect(persona.image).catch(() => {});
       session.sendText("Say hi! Greet the user briefly in character. Keep it to one short sentence.");
     } catch (err) {
       addTrace("error", `Connect failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -271,6 +275,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (enabled && sessionRef.current?.isConnected()) {
       playVisionOn();
       addTrace("system", "Vision enabled");
+      playPageSparkleEffect("#67e8f9").catch(() => {}); // Cyan sparkles
       startVision((base64, mimeType) => {
         addTrace("vision_frame", "frame sent");
         sessionRef.current?.sendImage(base64, mimeType);
