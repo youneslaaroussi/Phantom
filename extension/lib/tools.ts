@@ -562,10 +562,15 @@ async function executeToolInternal(
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: (sel: string, val: string) => {
-          const el = document.querySelector(sel) as HTMLInputElement | null;
+          const el = document.querySelector(sel) as HTMLElement | null;
           if (!el) throw new Error(`Element not found: ${sel}`);
           el.focus();
-          el.value = val;
+          if (el.isContentEditable) {
+            el.textContent = "";
+            document.execCommand("insertText", false, val);
+          } else {
+            (el as HTMLInputElement).value = val;
+          }
           el.dispatchEvent(new Event("input", { bubbles: true }));
           el.dispatchEvent(new Event("change", { bubbles: true }));
         },
