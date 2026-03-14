@@ -31,16 +31,16 @@ The whole project — Chrome extension, Cloud Run proxy, landing page, 8 persona
   <text x="140" y="44" text-anchor="middle" fill="#5F6368" font-size="11" font-weight="500">CHROME EXTENSION</text>
   <!-- Extension boxes -->
   <rect x="40" y="60" width="200" height="44" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#s1)"/>
-  <circle cx="62" cy="82" r="10" fill="#e8f0fe"/><text x="62" y="86" text-anchor="middle" fill="#4285F4" font-size="10">🎙</text>
+  <circle cx="62" cy="82" r="10" fill="#e8f0fe"/><text x="62" y="86" text-anchor="middle" fill="#4285F4" font-size="10">MIC</text>
   <text x="82" y="86" fill="#1f1f1f" font-size="13" font-weight="500">Voice Input (16kHz PCM)</text>
   <rect x="40" y="116" width="200" height="44" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#s1)"/>
-  <circle cx="62" cy="138" r="10" fill="#e6f4ea"/><text x="62" y="142" text-anchor="middle" fill="#34A853" font-size="10">👁</text>
+  <circle cx="62" cy="138" r="10" fill="#e6f4ea"/><text x="62" y="142" text-anchor="middle" fill="#34A853" font-size="10">EYE</text>
   <text x="82" y="142" fill="#1f1f1f" font-size="13" font-weight="500">Vision (1fps JPEG)</text>
   <rect x="40" y="172" width="200" height="44" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#s1)"/>
-  <circle cx="62" cy="194" r="10" fill="#fef7e0"/><text x="62" y="198" text-anchor="middle" fill="#e37400" font-size="10">🔧</text>
+  <circle cx="62" cy="194" r="10" fill="#fef7e0"/><text x="62" y="198" text-anchor="middle" fill="#e37400" font-size="10">API</text>
   <text x="82" y="198" fill="#1f1f1f" font-size="13" font-weight="500">20 Browser Tools</text>
   <rect x="40" y="228" width="200" height="44" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#s1)"/>
-  <circle cx="62" cy="250" r="10" fill="#fce8e6"/><text x="62" y="254" text-anchor="middle" fill="#EA4335" font-size="10">🛡</text>
+  <circle cx="62" cy="250" r="10" fill="#fce8e6"/><text x="62" y="254" text-anchor="middle" fill="#EA4335" font-size="10">PII</text>
   <text x="82" y="254" fill="#1f1f1f" font-size="13" font-weight="500">Privacy Shield</text>
   <!-- Cloud Run Proxy -->
   <rect x="310" y="100" width="180" height="140" rx="12" fill="#fff" stroke="#4285F4" stroke-width="1.5" filter="url(#s1)"/>
@@ -167,7 +167,7 @@ We built **Privacy Shield** to fix this.
   <text x="565" y="94" text-anchor="middle" fill="#5F6368" font-size="10">Restore styles</text>
   <rect x="660" y="50" width="120" height="60" rx="8" fill="#fff" stroke="#e8eaed" filter="url(#s2)"/>
   <text x="720" y="76" text-anchor="middle" fill="#1f1f1f" font-size="11" font-weight="500">Send to AI</text>
-  <text x="720" y="94" text-anchor="middle" fill="#5F6368" font-size="10">Secrets blurred ✓</text>
+  <text x="720" y="94" text-anchor="middle" fill="#5F6368" font-size="10">Secrets blurred OK</text>
   <!-- Arrows -->
   <line x1="150" y1="80" x2="178" y2="80" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah2)"/>
   <line x1="310" y1="80" x2="338" y2="80" stroke="#5F6368" stroke-width="1.5" marker-end="url(#ah2)"/>
