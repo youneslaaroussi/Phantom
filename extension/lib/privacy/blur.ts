@@ -1,5 +1,5 @@
 const BLUR_ATTR = "data-phantom-blurred";
-const BLUR_STYLE = "filter:blur(8px) !important;user-select:none !important;pointer-events:none !important;";
+const BLUR_STYLE = "position:relative !important;";
 
 export function applyBlur(elements: Element[]): void {
   for (const el of elements) {

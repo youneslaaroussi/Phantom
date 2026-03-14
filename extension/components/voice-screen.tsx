@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Mic, Square, Settings, Eye, EyeOff, Terminal, Volume2, VolumeX, Send, MousePointer2, X, Pause, Play, Code2 } from "lucide-react";
+import { Mic, Square, Settings, Eye, EyeOff, Terminal, Volume2, VolumeX, Send, MousePointer2, X, Pause, Play, Code2, Shield } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
 import { MarkdownText } from "./markdown";
 import { AnimatedMascot } from "./animated-mascot";
 import { playSparkles } from "../lib/sparkle-effect";
+import { BLUR_SENSITIVE_SCRIPT, UNBLUR_SCRIPT } from "../lib/privacy/inject";
 import { Tooltip } from "./tooltip";
 
 import type { LiveVoiceName } from "../lib/live/types";
@@ -102,6 +103,8 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom }: VoiceSc
   const handleDisconnect = () => {
     disconnect();
   };
+
+  
 
   const handleTextSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -309,7 +312,9 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces, onOpenDom }: VoiceSc
           )}
 
           {transcript && (
-            <MarkdownText content={transcript} className="text-sm font-google-text leading-relaxed" style={{ color: "var(--g-on-surface)" }} />
+            <div className="w-full rounded-xl px-3 py-2 overflow-hidden" style={{ background: "rgba(0,0,0,0.02)", borderRadius: "12px" }}>
+              <MarkdownText content={transcript} className="text-sm font-google-text leading-relaxed" style={{ color: "var(--g-on-surface)", overflowWrap: "break-word", wordBreak: "break-word", overflow: "hidden" }} />
+            </div>
           )}
 
           {executingTool && (

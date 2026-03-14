@@ -4,6 +4,7 @@ import { compressScreenshot } from "./image";
 const CAPTURE_INTERVAL_MS = 1000;
 const JPEG_QUALITY = 50;
 
+
 let captureInterval: ReturnType<typeof setInterval> | null = null;
 let lastFrameData: string | null = null;
 let sendImageFn: ((base64: string, mimeType: string) => void) | null = null;
@@ -28,6 +29,7 @@ export function stopVision() {
   }
   sendImageFn = null;
   lastFrameData = null;
+  unblurActiveTab();
   console.log("[Vision] Stopped");
 }
 
@@ -54,14 +56,19 @@ async function captureAndSend() {
       quality: JPEG_QUALITY,
     });
 
-    if (tab.id && !tab.url?.startsWith("chrome://")) {
+    const compressed = await compressScreenshot(dataUrl);
+    sendImageFn(compressed.base64, compressed.mimeType);
+  } catch {}
+}
+
+async function unblurActiveTab() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id && !tab.url?.startsWith("chrome://")) {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: UNBLUR_SCRIPT,
       }).catch(() => {});
     }
-
-    const compressed = await compressScreenshot(dataUrl);
-    sendImageFn(compressed.base64, compressed.mimeType);
   } catch {}
 }

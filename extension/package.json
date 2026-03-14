@@ -1,7 +1,7 @@
 {
   "name": "phantom",
   "displayName": "Phantom",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Cloud-native AI voice agent for Chrome. Talk to Gemini Live, control any website by voice.",
   "author": "Younes Laaroussi hello@youneslaaroussi.ca",
   "scripts": {

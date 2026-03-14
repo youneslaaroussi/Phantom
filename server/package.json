@@ -1,6 +1,6 @@
 {
   "name": "phantom-server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "WebSocket proxy and landing page for Phantom",
   "author": "Younes Laaroussi hello@youneslaaroussi.ca",
   "type": "module",
