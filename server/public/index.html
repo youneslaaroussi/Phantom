@@ -65,28 +65,27 @@
 
     /* ─── Hero ─── */
     .hero {
-      padding: 140px 24px 80px;
+      padding: 120px 24px 72px;
       text-align: center;
       position: relative;
       overflow: hidden;
     }
     #glow-bg {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 0;
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 100vw; height: 100%;
+      pointer-events: none; z-index: 0; opacity: 0.45;
     }
-    .hero-inner { max-width: 720px; margin: 0 auto; position: relative; z-index: 1; }
+    .hero-inner {
+      max-width: 720px; margin: 0 auto; position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center;
+    }
     .hero-badge {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 6px 16px; border-radius: var(--radius-full);
       background: var(--blue-bg); color: var(--blue);
       font-family: var(--font); font-size: 13px; font-weight: 500;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
-    .hero-badge::before {
-      content: ''; width: 6px; height: 6px; border-radius: 50%;
-      background: var(--green); animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
     .hero h1 {
       font-family: var(--font); font-size: clamp(36px, 5vw, 56px);
       font-weight: 700; line-height: 1.15; letter-spacing: -0.02em;
@@ -117,7 +116,7 @@
     }
     .btn-secondary:hover { background: var(--blue-bg); border-color: var(--blue-light); }
     .hero-mascot {
-      width: 96px; height: 96px; margin: 0 auto 32px;
+      width: 80px; height: 80px; margin-bottom: 16px;
       animation: float 4s ease-in-out infinite;
       filter: drop-shadow(0 8px 24px rgba(66,133,244,0.2));
     }
@@ -404,7 +403,7 @@
   <script>lucide.createIcons();</script>
 
   <script>
-    // WebGL glow background
+    // WebGL glow background (vivid animated aurora)
     (function() {
       var canvas = document.getElementById('glow-bg');
       if (!canvas) return;
@@ -422,21 +421,22 @@
         'uniform float time;',
         'void main(){',
         '  vec2 p=uv;',
-        '  float dist=1.0-p.y;',
-        '  float w1=sin(dist*8.0+time*0.5)*0.5+0.5;',
-        '  float w2=sin(dist*14.0+time*0.8+1.5)*0.5+0.5;',
-        '  float w3=sin(dist*6.0+time*0.3+3.0)*0.5+0.5;',
+        '  float dist=p.y;',
+        '  float w1=sin(dist*12.0+time*0.6)*0.5+0.5;',
+        '  float w2=sin(dist*18.0+time*1.0+1.5)*0.5+0.5;',
+        '  float w3=sin(dist*8.0+time*0.4+3.0)*0.5+0.5;',
         '  float glow=(w1*0.35+w2*0.35+w3*0.3);',
-        '  float fade=pow(1.0-dist,1.5);',
-        '  float intensity=glow*fade*0.7;',
-        '  intensity*=sin(p.x*3.0+time*0.4)*0.1+0.9;',
+        '  float fade=pow(dist,0.5);',
+        '  float intensity=glow*fade*2.0;',
+        '  intensity*=sin(p.x*4.0+time*0.5)*0.12+0.88;',
         '  vec3 blue=vec3(0.26,0.52,0.96);',
-        '  vec3 cyan=vec3(0.4,0.72,0.96);',
-        '  vec3 light=vec3(0.91,0.95,1.0);',
-        '  float t1=sin(time*0.25+p.x*2.0)*0.5+0.5;',
-        '  vec3 col=mix(blue,cyan,t1)*intensity;',
-        '  col=mix(col,light,intensity*0.3);',
-        '  float alpha=intensity*0.35*smoothstep(0.0,0.5,1.0-dist);',
+        '  vec3 cyan=vec3(0.4,0.91,0.98);',
+        '  vec3 indigo=vec3(0.39,0.4,0.95);',
+        '  float t1=sin(time*0.3+p.x*2.0)*0.5+0.5;',
+        '  float t2=sin(time*0.2+dist*3.0)*0.5+0.5;',
+        '  vec3 col=mix(mix(blue,cyan,t1),indigo,t2*0.3);',
+        '  col*=intensity;',
+        '  float alpha=intensity*0.8*smoothstep(0.0,0.4,p.y);',
         '  gl_FragColor=vec4(col,min(alpha,1.0));',
         '}'
       ].join('\n'));
