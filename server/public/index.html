@@ -4,7 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Phantom — AI Voice Agent for Chrome</title>
+  <meta name="description" content="Talk to your browser. Phantom is a voice-powered AI agent that lives in Chrome. Ask it to click, scroll, read, summarize, and navigate — hands-free. Built with Gemini.">
+  <meta name="keywords" content="phantom, chrome extension, ai agent, voice assistant, gemini, browser automation, gemini live api">
+  <meta name="author" content="Younes Laaroussi">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Phantom — AI Voice Agent for Chrome">
+  <meta property="og:description" content="Talk to your browser. A voice-powered AI agent that clicks, scrolls, reads, and navigates for you. Built with Gemini Live API.">
+  <meta property="og:image" content="/og-image.png">
+  <meta property="og:url" content="https://phantom-server-pio3n3nsna-uc.a.run.app">
+  <meta property="og:site_name" content="Phantom">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Phantom — AI Voice Agent for Chrome">
+  <meta name="twitter:description" content="Talk to your browser. Voice-powered AI agent for Chrome, built with Gemini.">
+  <meta name="twitter:image" content="/og-image.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://phantom-server-pio3n3nsna-uc.a.run.app">
+
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Text:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
@@ -55,7 +80,7 @@
     }
     .nav-inner { max-width: var(--max-w); margin: 0 auto; width: 100%; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
     .logo { display: flex; align-items: center; gap: 10px; font-family: var(--font); font-weight: 500; font-size: 18px; color: var(--on-surface); text-decoration: none; }
-    .logo img { width: 32px; height: 32px; border-radius: 8px; }
+    .logo img { width: 40px; height: 40px; border-radius: 10px; }
     .nav-links { display: flex; align-items: center; gap: 8px; }
     .nav-links a { font-family: var(--font); font-size: 14px; font-weight: 500; text-decoration: none; padding: 10px 16px; border-radius: var(--radius-full); transition: all 0.2s; }
     .nav-link { color: var(--on-surface-variant); }
@@ -116,9 +141,9 @@
     }
     .btn-secondary:hover { background: var(--blue-bg); border-color: var(--blue-light); }
     .hero-mascot {
-      width: 80px; height: 80px; margin-bottom: 16px;
+      width: 120px; height: 120px; margin-bottom: 20px;
       animation: float 4s ease-in-out infinite;
-      filter: drop-shadow(0 8px 24px rgba(66,133,244,0.2));
+      filter: drop-shadow(0 8px 32px rgba(66,133,244,0.25));
     }
     @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
@@ -265,7 +290,8 @@
       </a>
       <div class="nav-links">
         <a href="https://github.com/youneslaaroussi/Phantom" class="nav-link" target="_blank">GitHub</a>
-        <a href="#install" class="nav-cta">Install</a>
+        <a href="/blog" class="nav-link">Blog</a>
+      <a id="nav-download-btn" href="https://github.com/youneslaaroussi/Phantom/releases/latest" class="nav-cta">Download</a>
       </div>
     </div>
   </nav>
@@ -485,7 +511,7 @@
     (function() {
       var REPO = 'youneslaaroussi/Phantom';
       var API = 'https://api.github.com/repos/' + REPO + '/releases/latest';
-      var btns = [document.getElementById('download-btn'), document.getElementById('download-btn-2')];
+      var btns = [document.getElementById('download-btn'), document.getElementById('download-btn-2'), document.getElementById('nav-download-btn')];
 
       fetch(API)
         .then(function(r) { return r.json(); })
@@ -496,9 +522,13 @@
             btns.forEach(function(btn) {
               if (!btn) return;
               btn.href = zip.browser_download_url;
-              var svg = btn.querySelector('svg');
-              var svgHtml = svg ? svg.outerHTML : '';
-              btn.innerHTML = svgHtml + ' Download ' + release.tag_name;
+              if (btn.id === 'nav-download-btn') {
+                btn.textContent = 'Download ' + release.tag_name;
+              } else {
+                var svg = btn.querySelector('svg');
+                var svgHtml = svg ? svg.outerHTML : '';
+                btn.innerHTML = svgHtml + ' Download ' + release.tag_name;
+              }
             });
           }
         })

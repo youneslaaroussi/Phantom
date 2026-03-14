@@ -86,6 +86,11 @@ app.get(
   })
 );
 
+// Blog route
+app.get("/blog", (c) => {
+  return c.redirect("/blog.html");
+});
+
 app.use("/*", serveStatic({ root: "./public" }));
 
 const port = parseInt(process.env.PORT || "8080");
