@@ -34,36 +34,44 @@ export interface SummarizeRequest {
 export async function handleSummarize(
   req: SummarizeRequest
 ): Promise<{ summary: string }> {
-  const apiKey = nextApiKey();
-  if (!apiKey) throw new Error("No API key configured");
-
-  const ai = new GoogleGenAI({ apiKey });
+  if (apiKeys.length === 0) throw new Error("No API key configured");
 
   const toolContext = req.toolCalls?.length
     ? `\n\nTools used: ${req.toolCalls.join(", ")}`
     : "";
 
-  const response = await ai.models.generateContent({
-    model: SUMMARIZE_MODEL,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `Summarize this voice assistant session in 1-3 sentences. Focus on what the user wanted and what was accomplished. Be specific about websites, topics, or tasks mentioned. Do not include filler or pleasantries.
+  const contents = [
+    {
+      role: "user" as const,
+      parts: [
+        {
+          text: `Summarize this voice assistant session in 1-3 sentences. Focus on what the user wanted and what was accomplished. Be specific about websites, topics, or tasks mentioned. Do not include filler or pleasantries.
 
 Transcript:
 ${req.transcript}${toolContext}
 
 Summary:`,
-          },
-        ],
-      },
-    ],
-  });
+        },
+      ],
+    },
+  ];
 
-  const text =
-    response.candidates?.[0]?.content?.parts?.[0]?.text || "Session occurred.";
+  for (let attempt = 0; attempt < apiKeys.length; attempt++) {
+    const apiKey = nextApiKey()!;
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: SUMMARIZE_MODEL,
+        contents,
+      });
 
-  return { summary: text.trim() };
+      const text =
+        response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (text) return { summary: text };
+    } catch (err) {
+      console.warn(`[Summarize] Key ${attempt + 1}/${apiKeys.length} failed:`, err);
+    }
+  }
+
+  return { summary: "Session occurred." };
 }

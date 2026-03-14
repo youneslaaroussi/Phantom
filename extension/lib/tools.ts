@@ -626,7 +626,13 @@ async function executeToolInternal(
         func: _injectScrollCursor,
         args: [dVp.w / 2, dVp.h / 2, "down", pixels],
       });
-      return { success: true, result: `Scrolled down ${pixels}px` };
+      const posDown = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => ({ y: Math.round(window.scrollY), max: Math.round(document.documentElement.scrollHeight - window.innerHeight), vh: window.innerHeight }),
+      });
+      const pd = posDown[0]?.result ?? { y: 0, max: 0, vh: 0 };
+      const atBottom = pd.y >= pd.max - 10;
+      return { success: true, result: `Scrolled down ${pixels}px. Position: ${pd.y}/${pd.max}px (viewport ${pd.vh}px).${atBottom ? " You are at the bottom of the page." : ""}` };
     }
 
     case "scrollUp": {
@@ -644,7 +650,13 @@ async function executeToolInternal(
         func: _injectScrollCursor,
         args: [uVp.w / 2, uVp.h / 2, "up", pixels],
       });
-      return { success: true, result: `Scrolled up ${pixels}px` };
+      const posUp = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => ({ y: Math.round(window.scrollY), max: Math.round(document.documentElement.scrollHeight - window.innerHeight), vh: window.innerHeight }),
+      });
+      const pu = posUp[0]?.result ?? { y: 0, max: 0, vh: 0 };
+      const atTop = pu.y <= 10;
+      return { success: true, result: `Scrolled up ${pixels}px. Position: ${pu.y}/${pu.max}px (viewport ${pu.vh}px).${atTop ? " You are at the top of the page." : ""}` };
     }
 
     case "scrollTo": {
@@ -672,7 +684,9 @@ async function executeToolInternal(
           }
           if (!el) return "Element not found";
           el.scrollIntoView({ behavior: "smooth", block: "center" });
-          return `Scrolled to: ${(el as HTMLElement).innerText?.slice(0, 60) || el.tagName}`;
+          const y = Math.round(window.scrollY);
+          const max = Math.round(document.documentElement.scrollHeight - window.innerHeight);
+          return `Scrolled to: ${(el as HTMLElement).innerText?.slice(0, 60) || el.tagName}. Position: ${y}/${max}px (viewport ${window.innerHeight}px).`;
         },
         args: [selector ?? null, text ?? null],
       });
