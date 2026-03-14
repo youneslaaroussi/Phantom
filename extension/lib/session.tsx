@@ -214,6 +214,18 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         onToolStart: ({ name }) => setExecutingTool(name),
         onToolEnd: () => setExecutingTool(null),
         onOutputLevel: setOutputLevel,
+        onInputTranscription: (text) => {
+          addTrace("user_speech", text);
+          sessionTranscriptRef.current.push(`User: ${text}`);
+        },
+        onOutputTranscription: (text) => {
+          addTrace("agent_speech", text);
+          sessionTranscriptRef.current.push(`Agent: ${text}`);
+        },
+        onGoAway: (timeLeft) => {
+          addTrace("system", `Server GoAway — ${timeLeft || "reconnecting soon"}`);
+          console.log("[Phantom] GoAway received, auto-reconnect will handle it");
+        },
         onError: (err) => {
           addTrace("error", err instanceof Error ? err.message : String(err));
           toast("error", err instanceof Error ? err.message : String(err));
