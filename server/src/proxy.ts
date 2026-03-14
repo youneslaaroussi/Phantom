@@ -6,23 +6,7 @@
  */
 
 import { GoogleGenAI, Modality, type Session } from "@google/genai";
-
-const apiKeys: string[] = (
-  process.env.GOOGLE_GENERATIVE_AI_API_KEYS ||
-  process.env.GEMINI_API_KEY ||
-  ""
-)
-  .split(",")
-  .map((k) => k.trim())
-  .filter(Boolean);
-
-let keyIndex = 0;
-function nextApiKey(): string | undefined {
-  if (apiKeys.length === 0) return undefined;
-  const key = apiKeys[keyIndex % apiKeys.length];
-  keyIndex++;
-  return key;
-}
+import { nextApiKey, markKeyFailed, markKeySuccess } from "./key-manager.js";
 
 interface ClientWs {
   send: (data: string) => void;
@@ -30,7 +14,7 @@ interface ClientWs {
 }
 
 export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
-  const apiKey = nextApiKey();
+  const apiKey = nextApiKey() as string;
   if (!apiKey) {
     clientWs.send(JSON.stringify({ error: "Server API key not configured" }));
     clientWs.close(1008, "No API key");
@@ -110,6 +94,7 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
         callbacks: {
           onopen() {
             console.log("[genai] Session opened");
+            markKeySuccess(apiKey);
             clientWs.send(JSON.stringify({ setupComplete: {} }));
             for (const msg of buffer) {
               handleClientMessage(msg);
@@ -146,6 +131,7 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
       });
     } catch (err: any) {
       console.error("[genai] Connect failed:", err.message);
+      markKeyFailed(apiKey);
       clientWs.send(JSON.stringify({ error: err.message }));
       clientWs.close(1011, "Connect failed");
       onClose();

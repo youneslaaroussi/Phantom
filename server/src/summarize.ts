@@ -6,23 +6,7 @@
  */
 
 import { GoogleGenAI } from "@google/genai";
-
-const apiKeys: string[] = (
-  process.env.GOOGLE_GENERATIVE_AI_API_KEYS ||
-  process.env.GEMINI_API_KEY ||
-  ""
-)
-  .split(",")
-  .map((k) => k.trim())
-  .filter(Boolean);
-
-let keyIndex = 0;
-function nextApiKey(): string | undefined {
-  if (apiKeys.length === 0) return undefined;
-  const key = apiKeys[keyIndex % apiKeys.length];
-  keyIndex++;
-  return key;
-}
+import { nextApiKey, markKeyFailed, markKeySuccess, getKeyCount } from "./key-manager.js";
 
 const SUMMARIZE_MODEL = "gemini-2.5-flash-lite";
 
@@ -34,7 +18,7 @@ export interface SummarizeRequest {
 export async function handleSummarize(
   req: SummarizeRequest
 ): Promise<{ summary: string }> {
-  if (apiKeys.length === 0) throw new Error("No API key configured");
+  if (getKeyCount() === 0) throw new Error("No API key configured");
 
   const toolContext = req.toolCalls?.length
     ? `\n\nTools used: ${req.toolCalls.join(", ")}`
@@ -56,7 +40,8 @@ Summary:`,
     },
   ];
 
-  for (let attempt = 0; attempt < apiKeys.length; attempt++) {
+  const keyCount = getKeyCount();
+  for (let attempt = 0; attempt < keyCount; attempt++) {
     const apiKey = nextApiKey()!;
     try {
       const ai = new GoogleGenAI({ apiKey });
@@ -67,9 +52,13 @@ Summary:`,
 
       const text =
         response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (text) return { summary: text };
+      if (text) {
+        markKeySuccess(apiKey);
+        return { summary: text };
+      }
     } catch (err) {
-      console.warn(`[Summarize] Key ${attempt + 1}/${apiKeys.length} failed:`, err);
+      markKeyFailed(apiKey);
+      console.warn(`[Summarize] Key ${attempt + 1}/${keyCount} failed:`, err);
     }
   }
 

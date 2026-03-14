@@ -4,23 +4,7 @@
  */
 
 import { GoogleGenAI } from "@google/genai";
-
-const apiKeys: string[] = (
-  process.env.GOOGLE_GENERATIVE_AI_API_KEYS ||
-  process.env.GEMINI_API_KEY ||
-  ""
-)
-  .split(",")
-  .map((k) => k.trim())
-  .filter(Boolean);
-
-let keyIndex = 0;
-function nextApiKey(): string | undefined {
-  if (apiKeys.length === 0) return undefined;
-  const key = apiKeys[keyIndex % apiKeys.length];
-  keyIndex++;
-  return key;
-}
+import { nextApiKey, markKeyFailed, markKeySuccess } from "./key-manager.js";
 
 const MODEL = "gemini-2.5-flash-lite";
 
@@ -56,18 +40,24 @@ export async function handleContentAction(
   const basePrompt = PROMPTS[req.action] || PROMPTS.explain;
   const extra = req.instruction ? `\n\nAdditional instruction: ${req.instruction}` : "";
 
-  const response = await ai.models.generateContent({
-    model: MODEL,
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `${basePrompt}${extra}\n\nText:\n${req.text}` }],
-      },
-    ],
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: `${basePrompt}${extra}\n\nText:\n${req.text}` }],
+        },
+      ],
+    });
 
-  const text =
-    response.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to process.";
+    const text =
+      response.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to process.";
 
-  return { result: text.trim() };
+    markKeySuccess(apiKey);
+    return { result: text.trim() };
+  } catch (err) {
+    markKeyFailed(apiKey);
+    throw err;
+  }
 }

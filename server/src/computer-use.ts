@@ -11,23 +11,7 @@
  */
 
 import { GoogleGenAI } from "@google/genai";
-
-const apiKeys: string[] = (
-  process.env.GOOGLE_GENERATIVE_AI_API_KEYS ||
-  process.env.GEMINI_API_KEY ||
-  ""
-)
-  .split(",")
-  .map((k) => k.trim())
-  .filter(Boolean);
-
-let keyIndex = 0;
-function nextApiKey(): string | undefined {
-  if (apiKeys.length === 0) return undefined;
-  const key = apiKeys[keyIndex % apiKeys.length];
-  keyIndex++;
-  return key;
-}
+import { nextApiKey, markKeyFailed, markKeySuccess } from "./key-manager.js";
 
 interface ComputerUseAction {
   type:
@@ -93,7 +77,10 @@ export async function handleComputerUse(req: ComputerUseRequest): Promise<Comput
   if (NATIVE_CU_MODELS.includes(requestedModel)) {
     try {
       const result = await tryNativeComputerUse(apiKey, requestedModel, req);
-      if (result.success) return result;
+      if (result.success) {
+        markKeySuccess(apiKey);
+        return result;
+      }
       console.log("[computer-use] Native CU failed, falling back to vision:", result.error);
     } catch (err: any) {
       console.log("[computer-use] Native CU error, falling back:", err.message);
@@ -102,12 +89,17 @@ export async function handleComputerUse(req: ComputerUseRequest): Promise<Comput
 
   // Fallback: vision-based coordinate extraction
   try {
-    return await tryVisionFallback(apiKey, VISION_FALLBACK_MODEL, req);
+    const result = await tryVisionFallback(apiKey, VISION_FALLBACK_MODEL, req);
+    markKeySuccess(apiKey);
+    return result;
   } catch (err: any) {
     // Last resort: try with the requested model without CU tool
     try {
-      return await tryVisionFallback(apiKey, requestedModel, req);
+      const result = await tryVisionFallback(apiKey, requestedModel, req);
+      markKeySuccess(apiKey);
+      return result;
     } catch (err2: any) {
+      markKeyFailed(apiKey);
       return { success: false, actions: [], error: `All methods failed. Last error: ${err2.message}` };
     }
   }
