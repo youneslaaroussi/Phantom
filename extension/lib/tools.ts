@@ -11,6 +11,7 @@ import type { LiveToolDeclaration } from "./live/types";
 import { playNavigate, playScroll, playHighlight, playTyping, playSuccess } from "./sounds";
 import { executeComputerAction } from "./computer-use";
 import { executeContentAction, type ContentActionType } from "./content-actions";
+import { showAgentCursorAtSelector } from "./agent-cursor";
 import {
   addMemory,
   searchMemories,
@@ -68,6 +69,16 @@ export function getToolDeclarations(): LiveToolDeclaration[] {
         name: "readPageContent",
         description: "Read the current page to see all the buttons, links, inputs, and other things the user can interact with.",
         parameters: { type: "object", properties: {} },
+      },
+      {
+        name: "getAccessibilitySnapshot",
+        description: "Get a structured list of all interactive elements on the page (buttons, links, inputs, etc.) with their roles, names, and selectors. Use this to understand what's on the page before clicking or interacting. Optionally filter by a query to find specific elements.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Optional: filter elements by text match (e.g. 'submit button', 'search input')" },
+          },
+        },
       },
       {
         name: "findOnPage",
@@ -277,6 +288,60 @@ async function executeToolInternal(
       return { success: true, result: `Switched to tab ${index}: ${tabs[index].title}` };
     }
 
+    case "getAccessibilitySnapshot": {
+      const query = (args.query as string) || "";
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return { success: false, error: "No active tab" };
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (q: string) => {
+          const sels = [
+            "button", "a[href]", "input", "textarea", "select",
+            '[role="button"]', '[role="link"]', '[role="textbox"]',
+            '[tabindex]:not([tabindex="-1"])', "[onclick]",
+          ];
+          const elements: string[] = [];
+          let idx = 0;
+          const allEls = document.querySelectorAll(sels.join(","));
+          const lq = q.toLowerCase();
+          allEls.forEach((el) => {
+            const h = el as HTMLElement;
+            const style = window.getComputedStyle(h);
+            if (style.display === "none" || style.visibility === "hidden") return;
+            const rect = h.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
+
+            let name = h.getAttribute("aria-label") || "";
+            if (!name && (h instanceof HTMLInputElement || h instanceof HTMLTextAreaElement)) {
+              name = h.labels?.[0]?.textContent?.trim() || h.placeholder || "";
+            }
+            if (!name) name = h.textContent?.trim() || "";
+            name = name.slice(0, 80);
+
+            let role = h.getAttribute("role") || "";
+            if (!role) {
+              const tag = h.tagName.toLowerCase();
+              if (tag === "button") role = "button";
+              else if (tag === "a") role = "link";
+              else if (tag === "input") role = (h as HTMLInputElement).type === "submit" ? "button" : "textbox";
+              else if (tag === "textarea") role = "textbox";
+              else if (tag === "select") role = "combobox";
+            }
+
+            if (lq && !name.toLowerCase().includes(lq) && !role.toLowerCase().includes(lq)) return;
+
+            const sel = h.id ? `#${h.id}` : h.className ? `.${h.className.toString().split(" ")[0]}` : h.tagName.toLowerCase();
+            const disabled = h.hasAttribute("disabled") ? " [DISABLED]" : "";
+            elements.push(`[${idx}] ${role.toUpperCase()}: "${name}" → ${sel}${disabled}`);
+            idx++;
+          });
+          return elements.slice(0, 50).join("\n") || "No interactive elements found.";
+        },
+        args: [query],
+      });
+      return { success: true, result: results[0]?.result || "No elements found" };
+    }
+
     case "readPageContent": {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
@@ -341,6 +406,14 @@ async function executeToolInternal(
       const selector = args.selector as string;
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) return { success: false, error: "No active tab" };
+      // Show agent cursor at target
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: showAgentCursorAtSelector,
+        args: [selector],
+      });
+      // Wait for cursor animation then click
+      await new Promise((r) => setTimeout(r, 450));
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: (sel: string) => {
@@ -380,13 +453,31 @@ async function executeToolInternal(
       if (!tab?.id) return { success: false, error: "No active tab" };
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (k: string) => {
-          document.activeElement?.dispatchEvent(
-            new KeyboardEvent("keydown", { key: k, bubbles: true })
-          );
-          document.activeElement?.dispatchEvent(
-            new KeyboardEvent("keyup", { key: k, bubbles: true })
-          );
+        func: (keyToPress: string) => {
+          const keyMap: Record<string, { code: string; keyCode: number }> = {
+            ArrowDown: { code: "ArrowDown", keyCode: 40 },
+            ArrowUp: { code: "ArrowUp", keyCode: 38 },
+            ArrowLeft: { code: "ArrowLeft", keyCode: 37 },
+            ArrowRight: { code: "ArrowRight", keyCode: 39 },
+            Enter: { code: "Enter", keyCode: 13 },
+            Escape: { code: "Escape", keyCode: 27 },
+            Tab: { code: "Tab", keyCode: 9 },
+            Backspace: { code: "Backspace", keyCode: 8 },
+            Delete: { code: "Delete", keyCode: 46 },
+            " ": { code: "Space", keyCode: 32 },
+          };
+          const info = keyMap[keyToPress] || { code: keyToPress, keyCode: 0 };
+          const props = {
+            key: keyToPress, code: info.code, keyCode: info.keyCode,
+            which: info.keyCode, bubbles: true, cancelable: true,
+            composed: true, view: window,
+          };
+          const targets = [document.activeElement || document.body, document.body, document.documentElement];
+          for (const target of targets) {
+            target.dispatchEvent(new KeyboardEvent("keydown", props));
+            target.dispatchEvent(new KeyboardEvent("keypress", props));
+            target.dispatchEvent(new KeyboardEvent("keyup", props));
+          }
         },
         args: [key],
       });

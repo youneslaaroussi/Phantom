@@ -35,7 +35,7 @@ const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 const TOOL_GUIDELINES = `
 
 Guidelines:
-- When asked to do something on a page, use readPageContent first to understand the layout
+- When asked to do something on a page, use getAccessibilitySnapshot first to understand the interactive elements
 - After clicking or filling, briefly confirm what you did
 - If something fails, explain what went wrong and try an alternative approach
 - Don't read long text aloud — summarize it instead

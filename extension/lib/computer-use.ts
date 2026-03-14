@@ -14,6 +14,7 @@
 
 import { getServerUrl } from "./connection-mode";
 import { addTrace } from "./trace";
+import { showAgentCursor } from "./agent-cursor";
 
 // Configurable — swap to gemini-3.1-flash-preview when computer use lands there
 const COMPUTER_USE_MODEL = "gemini-3-flash-preview";
@@ -181,12 +182,18 @@ async function executeAction(
     case "click": {
       const x = scaleX(action.x ?? 500);
       const y = scaleY(action.y ?? 500);
+      // Show agent cursor before clicking
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: showAgentCursor,
+        args: [x, y],
+      });
+      await sleep(450); // Wait for cursor animation
       await chrome.scripting.executeScript({
         target: { tabId },
         func: (cx: number, cy: number) => {
           const el = document.elementFromPoint(cx, cy);
           if (el) {
-            // Dispatch full mouse event sequence for maximum compatibility
             for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"] as const) {
               el.dispatchEvent(new PointerEvent(type, {
                 clientX: cx, clientY: cy,
