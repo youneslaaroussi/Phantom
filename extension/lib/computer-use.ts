@@ -8,8 +8,10 @@
  * Flow:
  * 1. Capture screenshot of active tab
  * 2. Send to Computer Use model with the task description
- * 3. Model returns actions (click_at, type, scroll, etc.) on a 1000x1000 grid
- * 4. We execute those actions by dispatching real mouse/keyboard events
+ * 3. Model returns actions (click_at, type, scroll, etc.) — native CU returns
+ *    pixel coords in image space, vision fallback uses a 1000x1000 grid
+ * 4. Native CU coords are rescaled from compressed image dims to the 1000x1000 grid
+ * 5. We execute those actions by dispatching real mouse/keyboard events
  */
 
 import { getServerUrl } from "./connection-mode";
@@ -38,14 +40,14 @@ export interface ComputerUseResult {
   actions: ComputerUseAction[];
   reasoning?: string;
   error?: string;
+  mode?: "native" | "vision";
 }
 
 /**
  * Ask the Computer Use model what to do, given a task and screenshot.
  */
-export async function planComputerAction(task: string): Promise<ComputerUseResult> {
+export async function planComputerAction(task: string): Promise<ComputerUseResult & { imageWidth?: number; imageHeight?: number }> {
   try {
-    // 1. Capture screenshot
     const screenshot = await captureScreenshot();
     if (!screenshot) {
       return { success: false, actions: [], error: "Failed to capture screenshot" };
@@ -53,7 +55,6 @@ export async function planComputerAction(task: string): Promise<ComputerUseResul
 
     addTrace("computer_use", `Planning: ${task}`);
 
-    // 2. Send to server for Computer Use API call
     const serverUrl = (await getServerUrl()).replace(/^wss:/, "https:").replace(/^ws:/, "http:");
     const response = await fetch(`${serverUrl.replace(/\/$/, "")}/api/computer-use`, {
       method: "POST",
@@ -73,7 +74,7 @@ export async function planComputerAction(task: string): Promise<ComputerUseResul
 
     const result: ComputerUseResult = await response.json();
     addTrace("computer_use", `Got ${result.actions.length} actions`, { actions: result.actions });
-    return result;
+    return { ...result, imageWidth: screenshot.width, imageHeight: screenshot.height };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     addTrace("error", `Computer use failed: ${msg}`);
@@ -105,6 +106,13 @@ export async function executeComputerAction(task: string): Promise<{
   }
 
   const viewport = await getViewportSize(tab.id);
+
+  if (plan.mode === "native" && plan.imageWidth && plan.imageHeight) {
+    for (const action of plan.actions) {
+      rescaleNativeCoords(action, plan.imageWidth, plan.imageHeight, viewport);
+    }
+  }
+
   let executed = 0;
 
   for (const action of plan.actions) {
@@ -151,20 +159,34 @@ export async function executeComputerAction(task: string): Promise<{
 
 // ─── Screenshot capture ───
 
-async function captureScreenshot(): Promise<{ base64: string; mimeType: string } | null> {
+async function captureScreenshot(): Promise<{ base64: string; mimeType: string; width: number; height: number } | null> {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.windowId) return null;
 
     const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
       format: "jpeg",
-      quality: 80,
+      quality: 60,
     });
 
     return await compressScreenshot(dataUrl);
   } catch {
     return null;
   }
+}
+
+function rescaleNativeCoords(
+  action: ComputerUseAction,
+  imgW: number,
+  imgH: number,
+  _viewport: { width: number; height: number }
+) {
+  const toGridX = (px: number) => Math.round((px / imgW) * 1000);
+  const toGridY = (py: number) => Math.round((py / imgH) * 1000);
+  if (action.x != null) action.x = toGridX(action.x);
+  if (action.y != null) action.y = toGridY(action.y);
+  if (action.endX != null) action.endX = toGridX(action.endX);
+  if (action.endY != null) action.endY = toGridY(action.endY);
 }
 
 // ─── Action execution ───

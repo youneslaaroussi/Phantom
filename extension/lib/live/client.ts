@@ -33,6 +33,7 @@ export class LiveSession {
     isSpeaking: false,
   };
   private resumptionHandle: string | null = null;
+  private toolAbortController: AbortController | null = null;
 
   constructor(config: LiveSessionConfig, callbacks: LiveSessionCallbacks = {}) {
     this.config = config;
@@ -239,16 +240,32 @@ export class LiveSession {
     functionCalls: Array<{ id: string; name: string; args: Record<string, unknown> }>
   ) {
     const responses: ToolCallResponse[] = [];
+    this.toolAbortController = new AbortController();
+    const { signal } = this.toolAbortController;
 
     for (const call of functionCalls) {
+      if (signal.aborted) {
+        responses.push({
+          id: call.id,
+          name: call.name,
+          response: { error: "Tool execution was stopped by the user." },
+        });
+        continue;
+      }
+
       try {
         this.callbacks.onToolStart?.({ name: call.name, id: call.id });
 
-        const result = await this.callbacks.onToolCall?.({
-          id: call.id,
-          name: call.name,
-          args: call.args,
-        });
+        const result = await Promise.race([
+          this.callbacks.onToolCall?.({
+            id: call.id,
+            name: call.name,
+            args: call.args,
+          }),
+          new Promise<never>((_, reject) => {
+            signal.addEventListener("abort", () => reject(new DOMException("Tool stopped by user", "AbortError")), { once: true });
+          }),
+        ]);
 
         this.callbacks.onToolEnd?.({ name: call.name, id: call.id, success: !result?.error });
 
@@ -258,18 +275,27 @@ export class LiveSession {
           response: result ?? { result: "ok" },
         });
       } catch (error) {
+        const aborted = error instanceof DOMException && error.name === "AbortError";
         this.callbacks.onToolEnd?.({ name: call.name, id: call.id, success: false });
         responses.push({
           id: call.id,
           name: call.name,
           response: {
-            error: error instanceof Error ? error.message : "Tool execution failed",
+            error: aborted ? "Tool execution was stopped by the user." : (error instanceof Error ? error.message : "Tool execution failed"),
           },
         });
       }
     }
 
+    this.toolAbortController = null;
     this.sendToolResponses(responses);
+  }
+
+  cancelToolExecution(): void {
+    if (this.toolAbortController) {
+      this.toolAbortController.abort();
+      this.toolAbortController = null;
+    }
   }
 
   private sendToolResponses(responses: ToolCallResponse[]) {

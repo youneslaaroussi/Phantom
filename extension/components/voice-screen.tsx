@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Mic, Square, Settings, Eye, EyeOff, Terminal, Volume2, VolumeX, Send, MousePointer2 } from "lucide-react";
+import { Mic, Square, Settings, Eye, EyeOff, Terminal, Volume2, VolumeX, Send, MousePointer2, X, Pause, Play } from "lucide-react";
 import { useSession } from "../lib/session";
 import { WaveVisualizer } from "./wave-visualizer";
 import { MarkdownText } from "./markdown";
@@ -48,6 +48,7 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
     startListening,
     stopListening,
     sendText,
+    cancelTool,
     transcript,
     executingTool,
     inputLevel,
@@ -61,6 +62,8 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
     setTabAudioEnabled,
     spotlightEnabled,
     setSpotlightEnabled,
+    paused,
+    setPaused,
   } = useSession();
 
   const [textInput, setTextInput] = useState("");
@@ -206,6 +209,20 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
               {tabAudioEnabled ? <Volume2 className="w-[18px] h-[18px]" /> : <VolumeX className="w-[18px] h-[18px]" />}
             </button>
           </Tooltip>
+          {isConnected && (
+            <Tooltip text={paused ? "Resume inputs" : "Pause inputs"}>
+              <button
+                onClick={() => setPaused(!paused)}
+                className="p-2 rounded-full transition-colors"
+                style={{
+                  background: paused ? "var(--g-red-bg, rgba(234,67,53,0.12))" : "transparent",
+                  color: paused ? "var(--g-red)" : "var(--g-outline)",
+                }}
+              >
+                {paused ? <Play className="w-[18px] h-[18px]" /> : <Pause className="w-[18px] h-[18px]" />}
+              </button>
+            </Tooltip>
+          )}
           <Tooltip text="Traces">
             <button
               onClick={onOpenTraces}
@@ -293,7 +310,18 @@ export const VoiceScreen = ({ onOpenSettings, onOpenTraces }: VoiceScreenProps) 
                 <div className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--g-yellow)", animationDelay: "300ms", animationDuration: "1s" }} />
                 <div className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: "var(--g-green)", animationDelay: "450ms", animationDuration: "1s" }} />
               </div>
-              <span className="text-[11px] font-google-text" style={{ color: "var(--g-outline)" }}>{humanizeToolName(executingTool)}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-google-text" style={{ color: "var(--g-outline)" }}>{humanizeToolName(executingTool)}</span>
+                <Tooltip text="Stop" position="top">
+                  <button
+                    onClick={cancelTool}
+                    className="w-5 h-5 flex items-center justify-center rounded-full transition-colors hover:bg-g-surface-container"
+                    style={{ color: "var(--g-outline)" }}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Tooltip>
+              </div>
             </div>
           )}
         </div>

@@ -6,6 +6,8 @@ let activeTabId: number | null = null;
 let sendChunkFn: ((pcm: Int16Array) => boolean) | null = null;
 let chunkCount = 0;
 let totalBytes = 0;
+let tabSwitchListener: ((info: chrome.tabs.TabActiveInfo) => void) | null = null;
+let restarting = false;
 
 export function isTabAudioActive(): boolean {
   return capturing;
@@ -73,6 +75,18 @@ export async function startTabAudio(
   chunkCount = 0;
   totalBytes = 0;
 
+  if (tabSwitchListener) {
+    chrome.tabs.onActivated.removeListener(tabSwitchListener);
+  }
+  tabSwitchListener = (info: chrome.tabs.TabActiveInfo) => {
+    if (!capturing || restarting) return;
+    if (info.tabId === activeTabId) return;
+    restarting = true;
+    addTrace("system", `Tab audio: tab switched to ${info.tabId}, restarting capture`);
+    restartOnTab(info.tabId).finally(() => { restarting = false; });
+  };
+  chrome.tabs.onActivated.addListener(tabSwitchListener);
+
   chunkInterval = setInterval(async () => {
     if (!capturing || !activeTabId) return;
     try {
@@ -107,6 +121,11 @@ export async function stopTabAudio(): Promise<void> {
   capturing = false;
   sendChunkFn = null;
 
+  if (tabSwitchListener) {
+    chrome.tabs.onActivated.removeListener(tabSwitchListener);
+    tabSwitchListener = null;
+  }
+
   if (chunkInterval) {
     clearInterval(chunkInterval);
     chunkInterval = null;
@@ -123,6 +142,77 @@ export async function stopTabAudio(): Promise<void> {
   }
 
   addTrace("system", `Tab audio stopped (${chunkCount} chunks, ${(totalBytes / 1024).toFixed(1)}KB total)`);
+}
+
+async function restartOnTab(newTabId: number): Promise<void> {
+  if (chunkInterval) {
+    clearInterval(chunkInterval);
+    chunkInterval = null;
+  }
+
+  if (activeTabId) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: activeTabId },
+        func: stopCaptureInPage,
+      });
+    } catch {}
+  }
+
+  const tab = await chrome.tabs.get(newTabId).catch(() => null);
+  if (!tab || tab.url?.startsWith("chrome://") || tab.url?.startsWith("chrome-extension://")) {
+    addTrace("system", "Tab audio: new tab is not capturable, pausing");
+    activeTabId = null;
+    return;
+  }
+
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: "get-tab-audio-stream-id", tabId: newTabId });
+    if (resp?.error || !resp?.streamId) {
+      addTrace("error", `Tab audio: failed to get stream for new tab: ${resp?.error || "no stream ID"}`);
+      return;
+    }
+
+    const started = await tryStartCapture(newTabId, resp.streamId);
+    if (!started) {
+      addTrace("error", "Tab audio: failed to start capture on new tab");
+      return;
+    }
+
+    activeTabId = newTabId;
+    chunkCount = 0;
+    totalBytes = 0;
+
+    chunkInterval = setInterval(async () => {
+      if (!capturing || !activeTabId) return;
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: activeTabId },
+          func: getChunkFromPage,
+        });
+        const samples = results?.[0]?.result as number[] | null;
+        if (samples && samples.length > 0 && sendChunkFn) {
+          const pcm = new Int16Array(samples);
+          const sent = sendChunkFn(pcm);
+          if (!sent) {
+            addTrace("system", "Tab audio: ws closed, auto-stopping");
+            stopTabAudio();
+            return;
+          }
+          chunkCount++;
+          const byteLen = pcm.byteLength;
+          totalBytes += byteLen;
+          addTrace("system", `Tab audio chunk #${chunkCount}: ${(byteLen / 1024).toFixed(1)}KB (total: ${(totalBytes / 1024).toFixed(1)}KB)`);
+        }
+      } catch (err) {
+        addTrace("error", `Tab audio chunk failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }, 500);
+
+    addTrace("system", `Tab audio restarted on tab ${newTabId}`);
+  } catch (err) {
+    addTrace("error", `Tab audio restart failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 async function tryStartCapture(tabId: number, streamId: string): Promise<boolean> {

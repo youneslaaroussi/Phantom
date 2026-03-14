@@ -44,9 +44,9 @@ Guidelines:
 - Don't read long text aloud — summarize it instead
 - Keep responses SHORT — the user is listening, not reading. 1-2 sentences max unless they ask for detail.
 - You have tools to navigate tabs, click elements, fill forms, scroll, highlight things, and more. Use them proactively.
-- For web interactions, prefer computerAction (AI vision clicking) as your primary tool — it takes a screenshot, uses AI vision to find coordinates, and clicks/types at exact positions. It works on everything: buttons, links, canvas, iframes, video players, complex UIs.
-- Fall back to clickOn/typeInto with CSS selectors only when computerAction fails or for simple, repetitive form-filling where speed matters.
-- Use getAccessibilitySnapshot to understand what's on the page, but act with computerAction.
+- For forms, inputs, dropdowns, checkboxes, and standard HTML controls, prefer the DOM tools (clickOn, typeInto, pressKey) with CSS selectors — they are faster and more reliable for structured elements.
+- Use computerAction (AI vision clicking) only for complex UIs where DOM tools won't work: canvas elements, iframes, video players, custom widgets, or when you can see something on screen but can't find a CSS selector for it.
+- Use getAccessibilitySnapshot to understand what's on the page and find CSS selectors for DOM tools.
 - Use contentAction to highlight text on the page and show a popup with a summary, rewrite, explanation, translation, or simplified version.
 - You have memory! Use rememberThis when the user asks you to remember something or when you learn important facts about them.
 - Use recallMemory when the user references past sessions or says "do you remember...".
@@ -76,6 +76,7 @@ interface SessionContextValue {
   startListening: (deviceId?: string) => Promise<void>;
   stopListening: () => void;
   sendText: (text: string) => void;
+  cancelTool: () => void;
   transcript: string;
   executingTool: string | null;
   inputLevel: number;
@@ -90,6 +91,8 @@ interface SessionContextValue {
   setTabAudioEnabled: (enabled: boolean) => void;
   spotlightEnabled: boolean;
   setSpotlightEnabled: (enabled: boolean) => void;
+  paused: boolean;
+  setPaused: (paused: boolean) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -111,6 +114,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [visionEnabled, setVisionEnabledState] = useState(false);
   const [tabAudioEnabled, setTabAudioEnabledState] = useState(false);
   const [spotlightEnabled, setSpotlightEnabledState] = useState(false);
+  const [paused, setPausedState] = useState(false);
+  const pausedInputsRef = useRef<{ vision: boolean; tabAudio: boolean; spotlight: boolean; listening: boolean }>({ vision: false, tabAudio: false, spotlight: false, listening: false });
   const sessionTranscriptRef = useRef<string[]>([]);
   const sessionToolCallsRef = useRef<string[]>([]);
 
@@ -178,10 +183,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       console.warn("[Phantom] Failed to build memory context:", err);
     }
 
+    const agentConfig = `\n\nYour config:\nPersona: ${persona.name} (${persona.id})\nAvatar: ${persona.image}\nVoice: ${voice}\nVision: ${visionEnabled ? "on" : "off"}\nTab audio: ${tabAudioEnabled ? "on" : "off"}\nCursor spotlight: ${spotlightEnabled ? "on" : "off"}`;
+
     const session = new LiveSession(
       {
         model: MODEL,
-        systemInstruction: persona.prompt + TOOL_GUIDELINES + memoryContext + buildSessionContext() + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
+        systemInstruction: persona.prompt + TOOL_GUIDELINES + memoryContext + buildSessionContext() + agentConfig + (visionEnabled ? VISION_ON_ADDENDUM : VISION_OFF_ADDENDUM),
         tools,
         responseModalities: ["AUDIO"],
         voice,
@@ -270,6 +277,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     stopSpotlight();
     setTabAudioEnabledState(false);
     setSpotlightEnabledState(false);
+    setPausedState(false);
 
     // Summarize session before cleanup (fire and forget)
     const transcript = sessionTranscriptRef.current.join("\n");
@@ -350,6 +358,48 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [state.status, spotlightEnabled]);
 
+  const setPaused = useCallback((pause: boolean) => {
+    if (pause) {
+      pausedInputsRef.current = {
+        vision: isVisionActive(),
+        tabAudio: isTabAudioActive(),
+        spotlight: spotlightEnabled,
+        listening: state.isListening,
+      };
+      addTrace("system", "Inputs paused");
+      if (isVisionActive()) stopVision();
+      if (isTabAudioActive()) stopTabAudio();
+      stopSpotlight();
+      if (state.isListening) sessionRef.current?.stopListening();
+      if (sessionRef.current?.isConnected()) {
+        sessionRef.current.sendText("[SYSTEM] All inputs paused. Vision, tab audio, spotlight, and mic are temporarily disabled.");
+      }
+    } else {
+      addTrace("system", "Inputs resumed");
+      const prev = pausedInputsRef.current;
+      if (prev.vision && sessionRef.current?.isConnected()) {
+        startVision((base64, mimeType) => {
+          sessionRef.current?.sendImage(base64, mimeType);
+        }, persona.image);
+      }
+      if (prev.tabAudio && sessionRef.current?.isConnected()) {
+        startTabAudio((pcm) => sessionRef.current?.pushTabAudio(pcm) ?? false).catch(() => {});
+      }
+      if (prev.spotlight && sessionRef.current?.isConnected()) {
+        startSpotlight((context) => {
+          sessionRef.current?.sendText(context);
+        }, persona.image);
+      }
+      if (prev.listening && sessionRef.current?.isConnected()) {
+        sessionRef.current.startListening({ onAudioLevel: setInputLevel }).catch(() => {});
+      }
+      if (sessionRef.current?.isConnected()) {
+        sessionRef.current.sendText("[SYSTEM] All inputs resumed. Previously active inputs have been restored.");
+      }
+    }
+    setPausedState(pause);
+  }, [spotlightEnabled, state.isListening, persona.image]);
+
   const startListening = useCallback(async (deviceId?: string) => {
     if (!sessionRef.current?.isConnected()) {
       await connect();
@@ -377,6 +427,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     addTrace("user_text", text);
     sessionTranscriptRef.current.push(`User: ${text}`);
     sessionRef.current.sendText(text);
+  }, []);
+
+  const cancelTool = useCallback(() => {
+    if (!sessionRef.current) return;
+    addTrace("system", "Tool execution cancelled by user");
+    sessionRef.current.cancelToolExecution();
   }, []);
 
   // Auto-reconnect on unexpected disconnect (not user-initiated)
@@ -419,6 +475,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         startListening,
         stopListening,
         sendText,
+        cancelTool,
         transcript,
         executingTool,
         inputLevel,
@@ -433,6 +490,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setTabAudioEnabled,
         spotlightEnabled,
         setSpotlightEnabled,
+        paused,
+        setPaused,
       }}
     >
       {children}

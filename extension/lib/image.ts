@@ -1,11 +1,11 @@
-const MAX_DIMENSION = 1024;
-const JPEG_QUALITY = 0.5;
+const MAX_DIMENSION = 768;
+const JPEG_QUALITY = 0.3;
 
 export function compressScreenshot(
   dataUrl: string,
   maxDim = MAX_DIMENSION,
   quality = JPEG_QUALITY
-): Promise<{ base64: string; mimeType: string }> {
+): Promise<{ base64: string; mimeType: string; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -27,7 +27,7 @@ export function compressScreenshot(
       ctx.drawImage(img, 0, 0, w, h);
       const compressed = canvas.toDataURL("image/jpeg", quality);
       const base64 = compressed.replace(/^data:image\/jpeg;base64,/, "");
-      resolve({ base64, mimeType: "image/jpeg" });
+      resolve({ base64, mimeType: "image/jpeg", width: w, height: h });
     };
     img.onerror = () => reject(new Error("Failed to load image"));
     img.src = dataUrl;
