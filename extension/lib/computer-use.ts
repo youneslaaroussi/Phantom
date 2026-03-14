@@ -1,29 +1,40 @@
 /**
  * Computer Use sidecar
- * 
+ *
  * Routes screen interaction tasks to Gemini's Computer Use model.
  * The voice model delegates here when it needs coordinate-level clicking,
  * dragging, or interacting with non-DOM elements (canvas, iframes, etc).
- * 
+ *
  * Flow:
- * 1. Capture screenshot of active tab
+ * 1. Capture high-quality screenshot of active tab (JPEG 90% at native viewport res)
  * 2. Send to Computer Use model with the task description
- * 3. Model returns actions (click_at, type, scroll, etc.) — native CU returns
- *    pixel coords in image space, vision fallback uses a 1000x1000 grid
- * 4. Native CU coords are rescaled from compressed image dims to the 1000x1000 grid
- * 5. We execute those actions by dispatching real mouse/keyboard events
+ * 3. Model returns actions with coordinates on a normalised 0-999 grid
+ * 4. We scale 0-999 grid coords to the actual viewport and dispatch events
  */
 
 import { getServerUrl } from "./connection-mode";
 import { addTrace } from "./trace";
 
-import { compressScreenshot } from "./image";
+import { screenshotForComputerUse } from "./image";
+import { showKeystroke } from "./keystroke-overlay";
 
 // Configurable — swap to gemini-3.1-flash-preview when computer use lands there
 const COMPUTER_USE_MODEL = "gemini-3-flash-preview";
 
 export interface ComputerUseAction {
-  type: "click" | "doubleClick" | "type" | "scroll" | "drag" | "keyPress" | "hover" | "wait";
+  type:
+    | "click"
+    | "doubleClick"
+    | "type"
+    | "scroll"
+    | "drag"
+    | "keyPress"
+    | "hover"
+    | "wait"
+    | "navigate"
+    | "goBack"
+    | "goForward"
+    | "search";
   x?: number;
   y?: number;
   endX?: number;
@@ -33,6 +44,9 @@ export interface ComputerUseAction {
   direction?: "up" | "down" | "left" | "right";
   amount?: number;
   delayMs?: number;
+  url?: string;
+  pressEnter?: boolean;
+  clearBeforeTyping?: boolean;
 }
 
 export interface ComputerUseResult {
@@ -46,7 +60,7 @@ export interface ComputerUseResult {
 /**
  * Ask the Computer Use model what to do, given a task and screenshot.
  */
-export async function planComputerAction(task: string): Promise<ComputerUseResult & { imageWidth?: number; imageHeight?: number }> {
+export async function planComputerAction(task: string): Promise<ComputerUseResult> {
   try {
     const screenshot = await captureScreenshot();
     if (!screenshot) {
@@ -74,7 +88,7 @@ export async function planComputerAction(task: string): Promise<ComputerUseResul
 
     const result: ComputerUseResult = await response.json();
     addTrace("computer_use", `Got ${result.actions.length} actions`, { actions: result.actions });
-    return { ...result, imageWidth: screenshot.width, imageHeight: screenshot.height };
+    return result;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     addTrace("error", `Computer use failed: ${msg}`);
@@ -106,12 +120,6 @@ export async function executeComputerAction(task: string): Promise<{
   }
 
   const viewport = await getViewportSize(tab.id);
-
-  if (plan.mode === "native" && plan.imageWidth && plan.imageHeight) {
-    for (const action of plan.actions) {
-      rescaleNativeCoords(action, plan.imageWidth, plan.imageHeight, viewport);
-    }
-  }
 
   let executed = 0;
 
@@ -145,6 +153,10 @@ export async function executeComputerAction(task: string): Promise<{
       if (a.type === "keyPress") return `pressed ${a.key}`;
       if (a.type === "hover") return `hovered at (${a.x}, ${a.y})`;
       if (a.type === "drag") return `dragged from (${a.x}, ${a.y}) to (${a.endX}, ${a.endY})`;
+      if (a.type === "navigate") return `navigated to ${a.url}`;
+      if (a.type === "goBack") return `went back`;
+      if (a.type === "goForward") return `went forward`;
+      if (a.type === "search") return `opened search`;
       if (a.type === "wait") return `waited ${a.delayMs}ms`;
       return a.type;
     })
@@ -166,27 +178,13 @@ async function captureScreenshot(): Promise<{ base64: string; mimeType: string; 
 
     const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
       format: "jpeg",
-      quality: 60,
+      quality: 90,
     });
 
-    return await compressScreenshot(dataUrl);
+    return await screenshotForComputerUse(dataUrl);
   } catch {
     return null;
   }
-}
-
-function rescaleNativeCoords(
-  action: ComputerUseAction,
-  imgW: number,
-  imgH: number,
-  _viewport: { width: number; height: number }
-) {
-  const toGridX = (px: number) => Math.round((px / imgW) * 1000);
-  const toGridY = (py: number) => Math.round((py / imgH) * 1000);
-  if (action.x != null) action.x = toGridX(action.x);
-  if (action.y != null) action.y = toGridY(action.y);
-  if (action.endX != null) action.endX = toGridX(action.endX);
-  if (action.endY != null) action.endY = toGridY(action.endY);
 }
 
 // ─── Action execution ───
@@ -204,48 +202,32 @@ async function executeAction(
     case "click": {
       const x = scaleX(action.x ?? 500);
       const y = scaleY(action.y ?? 500);
-      // Show agent cursor before clicking
       await chrome.scripting.executeScript({
         target: { tabId },
         func: _injectClickCursorAt,
         args: [x, y],
       });
-      await sleep(450); // Wait for cursor animation
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (cx: number, cy: number) => {
-          const el = document.elementFromPoint(cx, cy);
-          if (el) {
-            for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"] as const) {
-              el.dispatchEvent(new PointerEvent(type, {
-                clientX: cx, clientY: cy,
-                bubbles: true, cancelable: true,
-                view: window, button: 0, buttons: type.includes("down") ? 1 : 0,
-                pointerId: 1, pointerType: "mouse",
-              }));
-            }
-          }
-        },
-        args: [x, y],
-      });
+      await sleep(450);
+      await debuggerClick(tabId, x, y);
       break;
     }
 
     case "doubleClick": {
       const x = scaleX(action.x ?? 500);
       const y = scaleY(action.y ?? 500);
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (cx: number, cy: number) => {
-          const el = document.elementFromPoint(cx, cy);
-          if (el) {
-            el.dispatchEvent(new MouseEvent("dblclick", {
-              clientX: cx, clientY: cy,
-              bubbles: true, cancelable: true, view: window,
-            }));
-          }
-        },
-        args: [x, y],
+      await withDebugger(tabId, async (target) => {
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mousePressed", x, y, button: "left", clickCount: 1,
+        });
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseReleased", x, y, button: "left", clickCount: 1,
+        });
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mousePressed", x, y, button: "left", clickCount: 2,
+        });
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseReleased", x, y, button: "left", clickCount: 2,
+        });
       });
       break;
     }
@@ -253,73 +235,67 @@ async function executeAction(
     case "hover": {
       const x = scaleX(action.x ?? 500);
       const y = scaleY(action.y ?? 500);
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (cx: number, cy: number) => {
-          const el = document.elementFromPoint(cx, cy);
-          if (el) {
-            el.dispatchEvent(new MouseEvent("mouseover", {
-              clientX: cx, clientY: cy, bubbles: true, view: window,
-            }));
-            el.dispatchEvent(new MouseEvent("mouseenter", {
-              clientX: cx, clientY: cy, bubbles: false, view: window,
-            }));
-            el.dispatchEvent(new MouseEvent("mousemove", {
-              clientX: cx, clientY: cy, bubbles: true, view: window,
-            }));
-          }
-        },
-        args: [x, y],
+      await withDebugger(tabId, async (target) => {
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseMoved", x, y,
+        });
       });
       break;
     }
 
     case "type": {
       const text = action.text ?? "";
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (txt: string) => {
-          const el = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
-          if (el && ("value" in el)) {
-            el.value = txt;
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-            el.dispatchEvent(new Event("change", { bubbles: true }));
-          } else {
-            // Try inserting via execCommand for contentEditable
-            document.execCommand("insertText", false, txt);
-          }
-        },
-        args: [text],
-      });
+      const clearFirst = action.clearBeforeTyping ?? true;
+      const pressEnter = action.pressEnter ?? true;
+      if (action.x != null && action.y != null) {
+        const tx = scaleX(action.x);
+        const ty = scaleY(action.y);
+        await debuggerClick(tabId, tx, ty);
+        await sleep(100);
+      }
+      if (clearFirst) {
+        await debuggerKey(tabId, "Home");
+        await sleep(30);
+        await debuggerKeyCombo(tabId, "End", { shift: true });
+        await sleep(30);
+        await debuggerKey(tabId, "Backspace");
+        await sleep(50);
+      }
+      showKeystroke(text.length > 30 ? text.slice(0, 30) + "…" : text);
+      await debuggerType(tabId, text);
+      if (pressEnter) {
+        showKeystroke("Enter");
+        await debuggerKey(tabId, "Enter");
+      }
       break;
     }
 
     case "keyPress": {
-      const key = action.key ?? "Enter";
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (k: string) => {
-          const target = document.activeElement || document.body;
-          target.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
-          target.dispatchEvent(new KeyboardEvent("keypress", { key: k, bubbles: true }));
-          target.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true }));
-        },
-        args: [key],
-      });
+      const combo = action.key ?? "Enter";
+      showKeystroke(combo);
+      const parts = combo.split("+").map((p) => p.trim());
+      const key = parts.pop() || "";
+      const modifiers = {
+        ctrl: parts.some((p) => /^ctrl|control$/i.test(p)),
+        shift: parts.some((p) => /^shift$/i.test(p)),
+        alt: parts.some((p) => /^alt$/i.test(p)),
+        meta: parts.some((p) => /^meta|command|cmd|super$/i.test(p)),
+      };
+      await debuggerKeyCombo(tabId, key, modifiers);
       break;
     }
 
     case "scroll": {
       const dir = action.direction ?? "down";
       const amount = action.amount ?? 500;
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (d: string, px: number) => {
-          const dx = d === "left" ? -px : d === "right" ? px : 0;
-          const dy = d === "up" ? -px : d === "down" ? px : 0;
-          window.scrollBy(dx, dy);
-        },
-        args: [dir, amount],
+      const sx = action.x != null ? scaleX(action.x) : Math.round(viewport.width / 2);
+      const sy = action.y != null ? scaleY(action.y) : Math.round(viewport.height / 2);
+      const dx = dir === "left" ? -amount : dir === "right" ? amount : 0;
+      const dy = dir === "up" ? -amount : dir === "down" ? amount : 0;
+      await withDebugger(tabId, async (target) => {
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseWheel", x: sx, y: sy, deltaX: dx, deltaY: dy,
+        });
       });
       break;
     }
@@ -329,30 +305,49 @@ async function executeAction(
       const sy = scaleY(action.y ?? 500);
       const ex = scaleX(action.endX ?? 500);
       const ey = scaleY(action.endY ?? 500);
+      await withDebugger(tabId, async (target) => {
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mousePressed", x: sx, y: sy, button: "left", clickCount: 1,
+        });
+        const steps = 10;
+        for (let i = 1; i <= steps; i++) {
+          const x = sx + (ex - sx) * (i / steps);
+          const y = sy + (ey - sy) * (i / steps);
+          await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+            type: "mouseMoved", x: Math.round(x), y: Math.round(y), button: "left",
+          });
+        }
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          type: "mouseReleased", x: ex, y: ey, button: "left", clickCount: 1,
+        });
+      });
+      break;
+    }
+
+    case "navigate": {
+      const url = action.url ?? "";
+      await chrome.tabs.update(tabId, { url });
+      break;
+    }
+
+    case "goBack": {
       await chrome.scripting.executeScript({
         target: { tabId },
-        func: (startX: number, startY: number, endX: number, endY: number) => {
-          const el = document.elementFromPoint(startX, startY);
-          if (!el) return;
-          el.dispatchEvent(new PointerEvent("pointerdown", {
-            clientX: startX, clientY: startY, bubbles: true, button: 0, buttons: 1,
-          }));
-          // Simulate movement in steps
-          const steps = 10;
-          for (let i = 1; i <= steps; i++) {
-            const x = startX + (endX - startX) * (i / steps);
-            const y = startY + (endY - startY) * (i / steps);
-            el.dispatchEvent(new PointerEvent("pointermove", {
-              clientX: x, clientY: y, bubbles: true, button: 0, buttons: 1,
-            }));
-          }
-          const target = document.elementFromPoint(endX, endY) || el;
-          target.dispatchEvent(new PointerEvent("pointerup", {
-            clientX: endX, clientY: endY, bubbles: true, button: 0,
-          }));
-        },
-        args: [sx, sy, ex, ey],
+        func: () => window.history.back(),
       });
+      break;
+    }
+
+    case "goForward": {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => window.history.forward(),
+      });
+      break;
+    }
+
+    case "search": {
+      await chrome.tabs.update(tabId, { url: "https://www.google.com" });
       break;
     }
 
@@ -375,6 +370,105 @@ async function getViewportSize(tabId: number): Promise<{ width: number; height: 
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// ─── Chrome Debugger helpers (trusted input events) ───
+
+async function withDebugger<T>(tabId: number, fn: (target: { tabId: number }) => Promise<T>): Promise<T> {
+  const target = { tabId };
+  await chrome.debugger.attach(target, "1.3");
+  try {
+    return await fn(target);
+  } finally {
+    await chrome.debugger.detach(target).catch(() => {});
+  }
+}
+
+function modifierBit(m: { ctrl?: boolean; shift?: boolean; alt?: boolean; meta?: boolean }): number {
+  return (m.alt ? 1 : 0) | (m.ctrl ? 2 : 0) | (m.meta ? 4 : 0) | (m.shift ? 8 : 0);
+}
+
+async function debuggerType(tabId: number, text: string): Promise<void> {
+  await withDebugger(tabId, async (target) => {
+    for (const ch of text) {
+      await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+        type: "keyDown",
+        text: ch,
+      });
+      await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+        type: "keyUp",
+      });
+    }
+  });
+}
+
+async function debuggerKey(tabId: number, key: string): Promise<void> {
+  await withDebugger(tabId, async (target) => {
+    await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+      type: "rawKeyDown",
+      windowsVirtualKeyCode: keyToVirtualCode(key),
+      key,
+    });
+    await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+      type: "keyUp",
+      windowsVirtualKeyCode: keyToVirtualCode(key),
+      key,
+    });
+  });
+}
+
+async function debuggerKeyCombo(
+  tabId: number,
+  key: string,
+  modifiers: { ctrl?: boolean; shift?: boolean; alt?: boolean; meta?: boolean }
+): Promise<void> {
+  await withDebugger(tabId, async (target) => {
+    await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+      type: "rawKeyDown",
+      windowsVirtualKeyCode: keyToVirtualCode(key),
+      key,
+      modifiers: modifierBit(modifiers),
+    });
+    await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+      type: "keyUp",
+      windowsVirtualKeyCode: keyToVirtualCode(key),
+      key,
+      modifiers: modifierBit(modifiers),
+    });
+  });
+}
+
+async function debuggerClick(tabId: number, x: number, y: number): Promise<void> {
+  await withDebugger(tabId, async (target) => {
+    await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x,
+      y,
+      button: "left",
+      clickCount: 1,
+    });
+    await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x,
+      y,
+      button: "left",
+      clickCount: 1,
+    });
+  });
+}
+
+function keyToVirtualCode(key: string): number {
+  const map: Record<string, number> = {
+    Backspace: 8, Tab: 9, Enter: 13, Escape: 27, Space: 32,
+    ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40,
+    Delete: 46, Home: 36, End: 35, PageUp: 33, PageDown: 34,
+    a: 65, b: 66, c: 67, d: 68, e: 69, f: 70, g: 71, h: 72,
+    i: 73, j: 74, k: 75, l: 76, m: 77, n: 78, o: 79, p: 80,
+    q: 81, r: 82, s: 83, t: 84, u: 85, v: 86, w: 87, x: 88,
+    y: 89, z: 90, F1: 112, F2: 113, F3: 114, F4: 115, F5: 116,
+    F6: 117, F7: 118, F8: 119, F9: 120, F10: 121, F11: 122, F12: 123,
+  };
+  return map[key] ?? key.toUpperCase().charCodeAt(0);
 }
 
 function _injectClickCursorAt(x: number, y: number) {

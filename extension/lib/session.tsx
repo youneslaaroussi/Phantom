@@ -32,8 +32,19 @@ import { buildMemoryContext, summarizeSession } from "./memory/index";
 import { playPageLaunchEffect, playPageVisionEffect, playPageAudioEffect } from "./page-effects";
 import { startSpotlight, stopSpotlight } from "./spotlight";
 import { buildSessionContext } from "./context";
+import { showCaption } from "./captions";
 
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
+
+async function getActiveTabMeta(): Promise<string> {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab) {
+      return `Current tab — title: "${tab.title || "unknown"}", URL: ${tab.url || "unknown"}`;
+    }
+  } catch {}
+  return "Current tab — unknown";
+}
 
 const TOOL_GUIDELINES = `
 
@@ -136,7 +147,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await startTabAudio((pcm) => {
           return sessionRef.current?.pushTabAudio(pcm) ?? false;
         });
-        sessionRef.current?.sendText("[SYSTEM] You can now hear the audio playing in the user's browser tab. Listen and respond to what you hear.");
+        const tabMeta = await getActiveTabMeta();
+        sessionRef.current?.sendText(`[SYSTEM] Tab audio capture just enabled. The audio stream is starting up — wait 1-2 seconds before reacting to any audio so the stream has time to begin. ${tabMeta}. Listen and respond to what you actually hear.`);
       } catch (err) {
         addTrace("error", `Tab audio failed: ${err instanceof Error ? err.message : String(err)}`);
         toast("error", `Tab audio: ${err instanceof Error ? err.message : String(err)}`);
@@ -229,10 +241,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         onInputTranscription: (text) => {
           addTrace("user_speech", text);
           sessionTranscriptRef.current.push(`User: ${text}`);
+          showCaption(text, "user");
         },
         onOutputTranscription: (text) => {
           addTrace("agent_speech", text);
           sessionTranscriptRef.current.push(`Agent: ${text}`);
+          showCaption(text, "agent");
         },
         onGoAway: (timeLeft) => {
           addTrace("system", `Server GoAway — ${timeLeft || "reconnecting soon"}`);
@@ -297,7 +311,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Vision toggle
-  const setVisionEnabled = useCallback((enabled: boolean) => {
+  const setVisionEnabled = useCallback(async (enabled: boolean) => {
     setVisionEnabledState(enabled);
     if (enabled && sessionRef.current?.isConnected()) {
       playVisionOn();
@@ -307,7 +321,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         addTrace("vision_frame", "frame sent");
         sessionRef.current?.sendImage(base64, mimeType);
       }, persona.image);
-      sessionRef.current?.sendText("[SYSTEM] You can now see the user's screen. You'll receive a live view updated every second. Describe only what you actually see.");
+      const tabMeta = await getActiveTabMeta();
+      sessionRef.current?.sendText(`[SYSTEM] Screen vision just enabled. The first frames are arriving now — wait 1-2 seconds before describing anything so you see a real frame, not a blank or stale image. ${tabMeta}. Describe only what you actually see once frames start flowing.`);
     } else {
       playVisionOff();
       addTrace("system", "Vision disabled");
@@ -322,6 +337,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (visionEnabled && state.status === "connected" && sessionRef.current) {
       startVision((base64, mimeType) => {
+        addTrace("vision_frame", "frame sent");
         sessionRef.current?.sendImage(base64, mimeType);
       }, persona.image);
     } else if (!visionEnabled) {
@@ -330,14 +346,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   }, [state.status, visionEnabled]);
 
   // Spotlight toggle
-  const setSpotlightEnabled = useCallback((enabled: boolean) => {
+  const setSpotlightEnabled = useCallback(async (enabled: boolean) => {
     setSpotlightEnabledState(enabled);
     if (enabled && sessionRef.current?.isConnected()) {
       addTrace("system", "Spotlight enabled");
       startSpotlight((context) => {
         sessionRef.current?.sendText(context);
       }, persona.image);
-      sessionRef.current?.sendText("[SYSTEM] Spotlight is now active. You will receive context about the DOM element the user is pointing at with their cursor. Use this to understand what the user is focused on. Only comment on it if the user asks or if it's relevant to the conversation.");
+      const tabMeta = await getActiveTabMeta();
+      sessionRef.current?.sendText(`[SYSTEM] Cursor spotlight just enabled. It takes a moment before cursor context starts arriving — do not hallucinate element data until you receive the first [SPOTLIGHT] message. ${tabMeta}. Use cursor context to understand what the user is focused on. Only comment on it if the user asks or if it's relevant to the conversation.`);
     } else {
       addTrace("system", "Spotlight disabled");
       stopSpotlight();
@@ -379,6 +396,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       const prev = pausedInputsRef.current;
       if (prev.vision && sessionRef.current?.isConnected()) {
         startVision((base64, mimeType) => {
+          addTrace("vision_frame", "frame sent");
           sessionRef.current?.sendImage(base64, mimeType);
         }, persona.image);
       }

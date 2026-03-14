@@ -64,6 +64,16 @@ export function getToolDeclarations(): LiveToolDeclaration[] {
           required: ["index"],
         },
       },
+      {
+        name: "closeTab",
+        description: "Close a tab by its position, or the current tab if no index given.",
+        parameters: {
+          type: "object",
+          properties: {
+            index: { type: "number", description: "Which tab to close (0 = first tab). Omit to close the current tab." },
+          },
+        },
+      },
 
       {
         name: "readPageContent",
@@ -286,6 +296,22 @@ async function executeToolInternal(
       if (index < 0 || index >= tabs.length) return { success: false, error: `Invalid tab index ${index}` };
       await chrome.tabs.update(tabs[index].id!, { active: true });
       return { success: true, result: `Switched to tab ${index}: ${tabs[index].title}` };
+    }
+
+    case "closeTab": {
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      if (args.index != null) {
+        const idx = args.index as number;
+        if (idx < 0 || idx >= tabs.length) return { success: false, error: `Invalid tab index ${idx}` };
+        const title = tabs[idx].title;
+        await chrome.tabs.remove(tabs[idx].id!);
+        return { success: true, result: `Closed tab ${idx}: ${title}` };
+      }
+      const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!active?.id) return { success: false, error: "No active tab" };
+      const title = active.title;
+      await chrome.tabs.remove(active.id);
+      return { success: true, result: `Closed current tab: ${title}` };
     }
 
     case "getAccessibilitySnapshot": {
