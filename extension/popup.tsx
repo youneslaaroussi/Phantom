@@ -26,7 +26,7 @@ const App = () => {
     })();
   }, [hasApiKey]);
 
-  if (screen === "loading") return <div className="w-full h-full bg-black" />;
+  if (screen === "loading") return <div className="w-full h-full" style={{ background: "var(--g-surface)" }} />;
 
   if (screen === "setup") {
     return <SetupScreen onComplete={() => setScreen("voice")} />;
@@ -36,7 +36,7 @@ const App = () => {
     return <SettingsScreen onBack={() => setScreen("voice")} />;
   }
 
-  return <VoiceScreen onOpenSettings={() => setScreen("settings")} />;
+  return <VoiceScreen onOpenSettings={() => setScreen("settings")} onOpenTraces={() => {}} />;
 };
 
 const Popup = () => (

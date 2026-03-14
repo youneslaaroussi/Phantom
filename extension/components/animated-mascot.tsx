@@ -78,7 +78,7 @@ export const AnimatedMascot = ({ state, personaId = "default", size = 64, classN
       height={size}
       style={{
         imageRendering: "pixelated",
-        filter: "drop-shadow(0 0 12px rgba(103,232,249,0.4)) drop-shadow(0 0 24px rgba(99,102,241,0.2))",
+        filter: "drop-shadow(0 4px 16px rgba(66,133,244,0.2))",
       }}
     />
   );

@@ -1,16 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Text:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+:root {
+  --g-blue: #4285F4;
+  --g-blue-hover: #3367d6;
+  --g-blue-bg: #e8f0fe;
+  --g-blue-light: #d2e3fc;
+  --g-red: #EA4335;
+  --g-red-bg: #fce8e6;
+  --g-yellow: #FBBC05;
+  --g-yellow-bg: #fef7e0;
+  --g-green: #34A853;
+  --g-green-bg: #e6f4ea;
+  --g-surface: #ffffff;
+  --g-surface-dim: #f8f9fa;
+  --g-surface-container: #f1f3f4;
+  --g-surface-container-high: #e8eaed;
+  --g-on-surface: #1f1f1f;
+  --g-on-surface-variant: #444746;
+  --g-outline: #747775;
+  --g-outline-variant: #c4c7c5;
+  --g-font: 'Google Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --g-font-text: 'Google Sans Text', 'Google Sans', 'Segoe UI', system-ui, sans-serif;
+  --g-radius-sm: 8px;
+  --g-radius-md: 16px;
+  --g-radius-lg: 28px;
+  --g-radius-full: 100px;
+  --g-shadow-1: 0 1px 2px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06);
+  --g-shadow-2: 0 1px 3px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.06);
+  --g-shadow-3: 0 2px 6px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.08);
+}
+
 body {
-  background: #000;
-  color: #fff;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--g-surface);
+  color: var(--g-on-surface);
+  font-family: var(--g-font-text);
+  -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  line-height: 1.5;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }

@@ -317,11 +317,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const startListening = useCallback(async (deviceId?: string) => {
     if (!sessionRef.current?.isConnected()) {
       await connect();
-      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (!sessionRef.current?.isConnected()) {
+      console.warn("[Phantom] startListening: not connected after connect()");
+      return;
     }
     const micId = deviceId || await getSavedMicId();
     playListenStart();
-    await sessionRef.current?.startListening({
+    await sessionRef.current.startListening({
       deviceId: micId,
       onAudioLevel: setInputLevel,
     });

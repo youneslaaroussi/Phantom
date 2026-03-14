@@ -66,7 +66,7 @@ const FRAG = `
     outAlpha += outGlow;
     outAlpha *= 0.2 + u_speaking * 0.8;
     float outCrest = smoothstep(0.02, 0.0, abs(outDist)) * u_outputLevel * 0.4;
-    vec3 outColor = vec3(0.4, 0.91, 0.98);
+    vec3 outColor = vec3(0.26, 0.52, 0.96);
     vec3 outCol = outColor * (1.0 - uv.y * 0.5) + vec3(1.0) * outCrest;
 
     float inSpeed = 0.6 + u_inputLevel * 2.5;
@@ -81,7 +81,7 @@ const FRAG = `
     inAlpha += inGlow;
     inAlpha *= 0.15 + u_listening * 0.85;
     float inCrest = smoothstep(0.02, 0.0, abs(inDist)) * u_inputLevel * 0.5;
-    vec3 inColor = vec3(0.66, 0.33, 0.97);
+    vec3 inColor = vec3(0.92, 0.26, 0.21);
     vec3 inCol = inColor * (1.0 - uv.y * 0.5) + vec3(1.0) * inCrest;
 
     vec3 col = outCol * outAlpha + inCol * inAlpha * (1.0 - outAlpha * 0.5);

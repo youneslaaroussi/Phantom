@@ -26,7 +26,7 @@ const App = () => {
   };
 
   if (screen === "loading") {
-    return <div className="w-full h-full" style={{ background: "#0a0a12" }} />;
+    return <div className="w-full h-full" style={{ background: "var(--g-surface)" }} />;
   }
 
   if (screen === "setup") {

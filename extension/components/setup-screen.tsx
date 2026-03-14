@@ -6,15 +6,15 @@ import { playWake, playConnect, playSuccess, playPersona } from "../lib/sounds";
 import { PERSONAS, savePersonaId, type Persona } from "../lib/personas";
 import { loadEmbeddingModel, isModelReady, type ProgressCallback } from "../lib/memory";
 
-const PERSONA_COLORS: Record<string, { glow: string; accent: string; bg: string }> = {
-  default:   { glow: "rgba(103,232,249,0.4)", accent: "#67e8f9", bg: "rgba(103,232,249,0.06)" },
-  detective: { glow: "rgba(251,191,36,0.4)",  accent: "#fbbf24", bg: "rgba(251,191,36,0.06)" },
-  royal:     { glow: "rgba(168,85,247,0.4)",   accent: "#a855f7", bg: "rgba(168,85,247,0.06)" },
-  nerd:      { glow: "rgba(34,211,238,0.4)",   accent: "#22d3ee", bg: "rgba(34,211,238,0.06)" },
-  pirate:    { glow: "rgba(239,68,68,0.4)",    accent: "#ef4444", bg: "rgba(239,68,68,0.06)" },
-  chill:     { glow: "rgba(74,222,128,0.4)",   accent: "#4ade80", bg: "rgba(74,222,128,0.06)" },
-  wizard:    { glow: "rgba(139,92,246,0.4)",   accent: "#8b5cf6", bg: "rgba(139,92,246,0.06)" },
-  chaos:     { glow: "rgba(244,114,182,0.4)",  accent: "#f472b6", bg: "rgba(244,114,182,0.06)" },
+const PERSONA_COLORS: Record<string, { accent: string; bg: string }> = {
+  default:   { accent: "#4285F4", bg: "#e8f0fe" },
+  detective: { accent: "#e37400", bg: "#fef7e0" },
+  royal:     { accent: "#9334E9", bg: "#f3e8ff" },
+  nerd:      { accent: "#4285F4", bg: "#e8f0fe" },
+  pirate:    { accent: "#EA4335", bg: "#fce8e6" },
+  chill:     { accent: "#34A853", bg: "#e6f4ea" },
+  wizard:    { accent: "#9334E9", bg: "#f3e8ff" },
+  chaos:     { accent: "#EA4335", bg: "#fce8e6" },
 };
 
 function getPersonaColor(id: string) {
@@ -99,34 +99,34 @@ const PersonaCarousel = ({
   return (
     <div
       className="w-full h-full flex flex-col select-none overflow-hidden"
-      style={{ background: "#0a0a12", color: "#e2e8f0" }}
+      style={{ background: "var(--g-surface)", color: "var(--g-on-surface)" }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      <div className="pt-6 pb-2 text-center px-6">
-        <h1 className="text-lg font-bold tracking-tight">Pick my personality</h1>
-        <p className="text-xs mt-1" style={{ color: "#64748b" }}>Swipe to explore. You can change this later.</p>
+      <div className="pt-8 pb-2 text-center px-6">
+        <h1 className="text-xl font-google font-bold tracking-tight">Pick a personality</h1>
+        <p className="text-sm mt-1.5 font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>Swipe to explore. You can change this later.</p>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center relative px-6">
         {idx > 0 && (
           <button
             onClick={goPrev}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all"
-            style={{ background: "rgba(255,255,255,0.05)" }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:bg-g-surface-container"
+            style={{ background: "var(--g-surface-dim)", border: "1px solid var(--g-outline-variant)" }}
           >
-            <ChevronLeft className="w-4 h-4" style={{ color: "#64748b" }} />
+            <ChevronLeft className="w-4 h-4" style={{ color: "var(--g-on-surface-variant)" }} />
           </button>
         )}
         {idx < PERSONAS.length - 1 && (
           <button
             onClick={goNext}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all"
-            style={{ background: "rgba(255,255,255,0.05)" }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:bg-g-surface-container"
+            style={{ background: "var(--g-surface-dim)", border: "1px solid var(--g-outline-variant)" }}
           >
-            <ChevronRight className="w-4 h-4" style={{ color: "#64748b" }} />
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--g-on-surface-variant)" }} />
           </button>
         )}
 
@@ -134,9 +134,9 @@ const PersonaCarousel = ({
           className="flex flex-col items-center transition-all duration-300 ease-out"
           style={{ transform: `translateX(${dragOffset}px)` }}
         >
-          <div className="relative mb-4">
+          <div className="relative mb-5">
             <div
-              className="absolute inset-0 rounded-full blur-3xl opacity-40 transition-all duration-500"
+              className="absolute inset-0 rounded-full blur-3xl opacity-20 transition-all duration-500"
               style={{ background: color.accent, transform: "scale(2)" }}
             />
             <img
@@ -144,27 +144,29 @@ const PersonaCarousel = ({
               alt={selected.name}
               className="relative transition-all duration-300"
               style={{
-                width: 200,
-                height: 200,
+                width: 180,
+                height: 180,
                 imageRendering: "pixelated",
-                filter: `drop-shadow(0 0 40px ${color.glow})`,
+                filter: `drop-shadow(0 8px 32px ${color.accent}40)`,
                 animation: "float 4s ease-in-out infinite",
               }}
             />
           </div>
-          <style>{`@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}`}</style>
 
-          <div className="text-center space-y-1.5 mb-4">
-            <h2 className="text-xl font-bold tracking-tight transition-colors duration-300" style={{ color: color.accent }}>{selected.name}</h2>
-            <p className="text-sm" style={{ color: "#94a3b8" }}>{selected.tagline}</p>
-            <span className="inline-block text-[10px] px-2 py-0.5 rounded-full font-mono" style={{ background: "rgba(255,255,255,0.06)", color: "#64748b" }}>
-              voice: {selected.voice}
+          <div className="text-center space-y-2 mb-4">
+            <h2 className="text-xl font-google font-bold tracking-tight transition-colors duration-300" style={{ color: color.accent }}>{selected.name}</h2>
+            <p className="text-sm font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>{selected.tagline}</p>
+            <span
+              className="inline-block text-xs px-3 py-1 rounded-g-full font-google font-medium"
+              style={{ background: color.bg, color: color.accent }}
+            >
+              Voice: {selected.voice}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="px-6 pb-4 space-y-4">
+      <div className="px-6 pb-5 space-y-4">
         <div className="flex items-center gap-1.5 justify-center">
           {PERSONAS.map((p, i) => (
             <button
@@ -176,8 +178,7 @@ const PersonaCarousel = ({
               <div
                 className="absolute inset-0 rounded-full transition-all duration-300"
                 style={{
-                  background: i === idx ? color.accent : "rgba(99,102,241,0.25)",
-                  boxShadow: i === idx ? `0 0 8px ${color.glow}` : "none",
+                  background: i === idx ? color.accent : "var(--g-outline-variant)",
                 }}
               />
             </button>
@@ -187,15 +188,15 @@ const PersonaCarousel = ({
         <div className="flex gap-3 justify-center">
           <button
             onClick={onBack}
-            className="flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs transition-all"
-            style={{ color: "#64748b" }}
+            className="flex items-center gap-1 px-5 py-2.5 rounded-g-full text-sm font-google font-medium transition-all hover:bg-g-surface-container"
+            style={{ color: "var(--g-on-surface-variant)" }}
           >
-            <ChevronLeft className="w-3.5 h-3.5" /> Back
+            <ChevronLeft className="w-4 h-4" /> Back
           </button>
           <button
             onClick={onNext}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-sm transition-all"
-            style={{ background: "#67e8f9", color: "#0a0a12" }}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-g-full font-google font-medium text-sm transition-all text-white"
+            style={{ background: "var(--g-blue)", boxShadow: "var(--g-shadow-1)" }}
           >
             Next
             <ChevronRight className="w-4 h-4" />
@@ -280,34 +281,37 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
   const dots = (
     <div className="flex gap-2 mt-4 justify-center">
       {STEPS.map((s, i) => (
-        <div key={s} className="w-2 h-2 rounded-full transition-colors" style={{ background: i === stepIdx ? "#67e8f9" : "rgba(99,102,241,0.3)" }} />
+        <div
+          key={s}
+          className="w-2 h-2 rounded-full transition-colors"
+          style={{ background: i === stepIdx ? "var(--g-blue)" : "var(--g-outline-variant)" }}
+        />
       ))}
     </div>
   );
 
   if (step === "meet") {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center px-8" style={{ background: "#0a0a12", color: "#e2e8f0" }}>
+      <div className="w-full h-full flex flex-col items-center justify-center px-8" style={{ background: "var(--g-surface)", color: "var(--g-on-surface)" }}>
         <div className="max-w-sm w-full flex flex-col items-center text-center space-y-6">
           <img
             src={chrome.runtime.getURL("assets/mascot.png")}
             alt="Phantom"
             className="w-24 h-24"
-            style={{ imageRendering: "pixelated", filter: "drop-shadow(0 0 24px rgba(103,232,249,0.4))", animation: "float 4s ease-in-out infinite" }}
+            style={{ imageRendering: "pixelated", filter: "drop-shadow(0 8px 32px rgba(66,133,244,0.25))", animation: "float 4s ease-in-out infinite" }}
           />
-          <style>{`@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}`}</style>
 
           <div className="space-y-2">
-            <h1 className="text-xl font-bold tracking-tight">Hey, I'm Phantom</h1>
-            <p className="text-sm leading-relaxed" style={{ color: "#64748b" }}>
+            <h1 className="text-2xl font-google font-bold tracking-tight">Hey, I'm Phantom</h1>
+            <p className="text-sm font-google-text leading-relaxed" style={{ color: "var(--g-on-surface-variant)" }}>
               A little spirit that lives in your browser. Tell me what to do and I'll click, scroll, type, and navigate for you.
             </p>
           </div>
 
           <button
             onClick={() => setStep("persona")}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl font-medium text-sm transition-all"
-            style={{ background: "#67e8f9", color: "#0a0a12" }}
+            className="flex items-center gap-2 px-7 py-3 rounded-g-full font-google font-medium text-sm transition-all text-white"
+            style={{ background: "var(--g-blue)", boxShadow: "var(--g-shadow-1)" }}
           >
             Let's get started
             <ChevronRight className="w-4 h-4" />
@@ -348,39 +352,40 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
     };
 
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center px-8" style={{ background: "#0a0a12", color: "#e2e8f0" }}>
+      <div className="w-full h-full flex flex-col items-center justify-center px-8" style={{ background: "var(--g-surface)", color: "var(--g-on-surface)" }}>
         <div className="max-w-sm w-full flex flex-col items-center text-center space-y-6">
-          <div className="p-4 rounded-full" style={{ background: "rgba(103,232,249,0.1)" }}>
-            <Shield className="w-8 h-8" style={{ color: "#67e8f9" }} />
+          <div className="p-4 rounded-full" style={{ background: "var(--g-blue-bg)" }}>
+            <Shield className="w-8 h-8" style={{ color: "var(--g-blue)" }} />
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-lg font-bold tracking-tight">Setting things up</h1>
-            <p className="text-xs" style={{ color: "#64748b" }}>
+            <h1 className="text-xl font-google font-bold tracking-tight">Setting things up</h1>
+            <p className="text-sm font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>
               {selectedPersona.name} needs a couple of things to work properly.
             </p>
           </div>
 
           <div className="w-full space-y-3">
-            {/* Microphone permission */}
-            <div className="w-full rounded-xl p-3" style={{ background: "rgba(30,27,75,0.3)", border: "1px solid rgba(99,102,241,0.15)" }}>
+            <div className="w-full rounded-g-md p-3.5" style={{ background: "var(--g-surface-dim)", border: "1px solid var(--g-outline-variant)" }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Mic className="w-4 h-4" style={{ color: micGranted ? "#4ade80" : micDenied ? "#f87171" : "#64748b" }} />
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: micGranted ? "var(--g-green-bg)" : micDenied ? "var(--g-red-bg)" : "var(--g-surface-container)" }}>
+                    <Mic className="w-4 h-4" style={{ color: micGranted ? "var(--g-green)" : micDenied ? "var(--g-red)" : "var(--g-outline)" }} />
+                  </div>
                   <div className="text-left">
-                    <div className="text-xs font-medium">Microphone</div>
-                    <div className="text-[10px]" style={{ color: "#64748b" }}>
+                    <div className="text-sm font-google font-medium">Microphone</div>
+                    <div className="text-xs font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>
                       {micGranted ? "Access granted" : micDenied ? "Access denied" : "For voice conversations"}
                     </div>
                   </div>
                 </div>
                 {micGranted ? (
-                  <CheckCircle className="w-4 h-4" style={{ color: "#4ade80" }} />
+                  <CheckCircle className="w-5 h-5" style={{ color: "var(--g-green)" }} />
                 ) : (
                   <button
                     onClick={handleRequestMic}
-                    className="px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all"
-                    style={{ background: "#67e8f9", color: "#0a0a12" }}
+                    className="px-4 py-1.5 rounded-g-full text-xs font-google font-medium transition-all text-white"
+                    style={{ background: "var(--g-blue)" }}
                   >
                     Allow
                   </button>
@@ -389,40 +394,38 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
               {micDenied && (
                 <button
                   onClick={openPermissionsPage}
-                  className="w-full mt-2 px-3 py-1.5 rounded-lg text-[10px] transition-all"
-                  style={{ background: "rgba(248,113,113,0.1)", color: "#f87171", border: "1px solid rgba(248,113,113,0.2)" }}
+                  className="w-full mt-2.5 px-3 py-2 rounded-g-sm text-xs font-google font-medium transition-all"
+                  style={{ background: "var(--g-red-bg)", color: "var(--g-red)", border: "1px solid #fbc8c3" }}
                 >
                   Open Browser Settings
                 </button>
               )}
             </div>
 
-            {/* Embedding model download */}
-            <div className="w-full rounded-xl p-3" style={{ background: "rgba(30,27,75,0.3)", border: "1px solid rgba(99,102,241,0.15)" }}>
+            <div className="w-full rounded-g-md p-3.5" style={{ background: "var(--g-surface-dim)", border: "1px solid var(--g-outline-variant)" }}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
-                  <Brain className="w-4 h-4" style={{ color: embeddingReady ? "#4ade80" : "#64748b" }} />
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: embeddingReady ? "var(--g-green-bg)" : "var(--g-surface-container)" }}>
+                    <Brain className="w-4 h-4" style={{ color: embeddingReady ? "var(--g-green)" : "var(--g-outline)" }} />
+                  </div>
                   <div className="text-left">
-                    <div className="text-xs font-medium">Memory Model</div>
-                    <div className="text-[10px]" style={{ color: "#64748b" }}>
-                      {embeddingReady ? "Ready — memories will persist across sessions" : "Downloads ~30MB for local semantic memory"}
+                    <div className="text-sm font-google font-medium">Memory Model</div>
+                    <div className="text-xs font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>
+                      {embeddingReady ? "Ready" : "Downloads ~30MB for local memory"}
                     </div>
                   </div>
                 </div>
                 {embeddingReady ? (
-                  <CheckCircle className="w-4 h-4" style={{ color: "#4ade80" }} />
+                  <CheckCircle className="w-5 h-5" style={{ color: "var(--g-green)" }} />
                 ) : embeddingLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#67e8f9" }} />
+                  <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--g-blue)" }} />
                 ) : null}
               </div>
               {embeddingLoading && !embeddingReady && (
-                <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ background: "rgba(99,102,241,0.2)" }}>
+                <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ background: "var(--g-surface-container-high)" }}>
                   <div
-                    className="h-full transition-all duration-300"
-                    style={{
-                      width: `${embeddingProgress}%`,
-                      background: "#67e8f9",
-                    }}
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${embeddingProgress}%`, background: "var(--g-blue)" }}
                   />
                 </div>
               )}
@@ -432,15 +435,15 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => setStep("persona")}
-              className="flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs transition-all"
-              style={{ color: "#64748b" }}
+              className="flex items-center gap-1 px-5 py-2.5 rounded-g-full text-sm font-google font-medium transition-all hover:bg-g-surface-container"
+              style={{ color: "var(--g-on-surface-variant)" }}
             >
-              <ChevronLeft className="w-3.5 h-3.5" /> Back
+              <ChevronLeft className="w-4 h-4" /> Back
             </button>
             <button
               onClick={() => setStep("mic")}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-40"
-              style={{ background: "#67e8f9", color: "#0a0a12" }}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-g-full font-google font-medium text-sm transition-all text-white"
+              style={{ background: "var(--g-blue)", boxShadow: "var(--g-shadow-1)" }}
             >
               {embeddingReady ? "Next" : "Skip for now"}
               <ChevronRight className="w-4 h-4" />
@@ -454,18 +457,18 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
   }
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center px-8" style={{ background: "#0a0a12", color: "#e2e8f0" }}>
+    <div className="w-full h-full flex flex-col items-center justify-center px-8" style={{ background: "var(--g-surface)", color: "var(--g-on-surface)" }}>
       <div className="max-w-sm w-full flex flex-col items-center text-center space-y-6">
         <img
           src={chrome.runtime.getURL("assets/" + selectedPersona.image)}
           alt=""
           className="w-16 h-16"
-          style={{ imageRendering: "pixelated", filter: "drop-shadow(0 0 16px rgba(103,232,249,0.3))", animation: "float 4s ease-in-out infinite" }}
+          style={{ imageRendering: "pixelated", filter: "drop-shadow(0 8px 24px rgba(66,133,244,0.2))", animation: "float 4s ease-in-out infinite" }}
         />
 
         <div className="space-y-2">
-          <h1 className="text-lg font-bold tracking-tight">One last thing</h1>
-          <p className="text-xs" style={{ color: "#64748b" }}>Pick your microphone, then we're good to go.</p>
+          <h1 className="text-xl font-google font-bold tracking-tight">One last thing</h1>
+          <p className="text-sm font-google-text" style={{ color: "var(--g-on-surface-variant)" }}>Pick your microphone, then we're good to go.</p>
         </div>
 
         <div className="w-full">
@@ -474,8 +477,8 @@ export const SetupScreen = ({ onComplete }: SetupScreenProps) => {
 
         <button
           onClick={handleComplete}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl font-medium text-sm transition-all"
-          style={{ background: "#67e8f9", color: "#0a0a12" }}
+          className="flex items-center gap-2 px-7 py-3 rounded-g-full font-google font-medium text-sm transition-all text-white"
+          style={{ background: "var(--g-blue)", boxShadow: "var(--g-shadow-1)" }}
         >
           <Mic className="w-4 h-4" />
           Start talking to {selectedPersona.name}

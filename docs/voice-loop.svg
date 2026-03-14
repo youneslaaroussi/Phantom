@@ -1,4 +1,4 @@
-<svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:24px auto;display:block;font-family:'Google Sans',system-ui,sans-serif">
+<svg viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:24px auto;display:block;font-family:'Google Sans',sans-serif">
   <defs>
     <filter id="s3"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>
     <marker id="ah3" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#4285F4"/></marker>
@@ -6,7 +6,7 @@
     <marker id="ah3y" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#FBBC05"/></marker>
     <marker id="ah3gr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#5F6368"/></marker>
   </defs>
-  <rect width="800" height="220" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
+  <rect width="800" height="240" rx="16" fill="#f8f9fa" stroke="#e8eaed"/>
   <!-- User -->
   <rect x="30" y="70" width="120" height="80" rx="12" fill="#4285F4" filter="url(#s3)"/>
   <text x="90" y="108" text-anchor="middle" fill="#fff" font-size="13" font-weight="500">User</text>

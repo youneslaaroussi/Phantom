@@ -52,22 +52,33 @@ export const MicSelector = ({ className = "" }: MicSelectorProps) => {
     <div className={`relative ${className}`}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 text-xs text-gray-300 hover:bg-gray-800 transition-colors"
+        className="flex items-center gap-2.5 w-full px-4 py-3 text-sm font-google-text rounded-g-md transition-colors"
+        style={{
+          background: "var(--g-surface-dim)",
+          border: "1px solid var(--g-outline-variant)",
+          color: "var(--g-on-surface)",
+        }}
       >
-        <Mic className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+        <Mic className="w-4 h-4 shrink-0" style={{ color: "var(--g-outline)" }} />
         <span className="truncate flex-1 text-left">{selectedLabel}</span>
-        <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} style={{ color: "var(--g-outline)" }} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-gray-900 border border-gray-800 rounded-lg shadow-xl py-1 max-h-[160px] overflow-y-auto z-30">
+        <div
+          className="absolute top-full left-0 right-0 mt-1 rounded-g-md py-1 max-h-[160px] overflow-y-auto z-30"
+          style={{
+            background: "var(--g-surface)",
+            border: "1px solid var(--g-outline-variant)",
+            boxShadow: "var(--g-shadow-3)",
+          }}
+        >
           {devices.map((d) => (
             <button
               key={d.deviceId}
               onClick={() => handleSelect(d.deviceId)}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-800 transition-colors truncate ${
-                d.deviceId === selected ? "text-blue-400" : "text-gray-300"
-              }`}
+              className="w-full text-left px-4 py-2.5 text-sm font-google-text transition-colors truncate hover:bg-g-surface-dim"
+              style={{ color: d.deviceId === selected ? "var(--g-blue)" : "var(--g-on-surface)" }}
             >
               {d.label}
             </button>

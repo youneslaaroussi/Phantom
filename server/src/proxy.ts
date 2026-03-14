@@ -43,7 +43,7 @@ export function createGeminiProxy(clientWs: ClientWs, onClose: () => void) {
   const buffer: string[] = [];
 
   async function initSession(setupMsg: Record<string, unknown>) {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: "v1alpha" } });
     const setup = setupMsg.setup as Record<string, unknown>;
     const genConfig = (setup.generationConfig || {}) as Record<string, unknown>;
 
