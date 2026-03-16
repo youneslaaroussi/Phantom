@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/devpost-covers/05_retro_pixel.png" alt="Phantom Cover" width="100%" />
+<img src="devpost-covers/05_retro_pixel.png" alt="Phantom Cover" width="100%" />
 
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/extension/assets/icon.png" alt="Phantom" width="128" />
+<img src="extension/assets/icon.png" alt="Phantom" width="128" />
 
 # Phantom
 
@@ -21,8 +21,8 @@ Voice-powered AI agent for Chrome — clicks, scrolls, reads, and navigates for 
 </div>
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/media/phantom-demo.gif" alt="Phantom Demo" height="400" />
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/media/phantom-computer-use.gif" alt="Computer Use Demo" height="400" />
+<img src="media/phantom-demo.gif" alt="Phantom Demo" height="400" />
+<img src="media/phantom-computer-use.gif" alt="Computer Use Demo" height="400" />
 </div>
 
 ---
@@ -34,7 +34,7 @@ Voice-powered AI agent for Chrome — clicks, scrolls, reads, and navigates for 
 | **Gemini Model** | Gemini 2.5 Flash Native Audio via Live API — [`server/src/proxy.ts`](server/src/proxy.ts) |
 | **Google GenAI SDK** | `@google/genai` for Live sessions, computer use, summarization — [`server/src/proxy.ts`](server/src/proxy.ts), [`server/src/computer-use.ts`](server/src/computer-use.ts), [`server/src/summarize.ts`](server/src/summarize.ts) |
 | **Google Cloud Service** | Cloud Run (WebSocket proxy + AI endpoints) — [`deploy.sh`](deploy.sh), [`server/Dockerfile`](server/Dockerfile) |
-| **Architecture Diagram** | [System Architecture](https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/system-architecture.svg) + [8 more subsystem diagrams](docs/) |
+| **Architecture Diagram** | [System Architecture](docs/system-architecture.svg?raw=true) + [8 more subsystem diagrams](docs/) |
 | **Automated Deployment** | Single-command deploy: Docker build → Artifact Registry → Cloud Run → GitHub Release — [`deploy.sh`](deploy.sh), [CI/CD Actions](https://github.com/youneslaaroussi/Phantom/actions) |
 | **Blog** | [Full building story](blog/phantom-building-story.md) covering architecture, privacy, character design, and AI-assisted development. Created for the #GeminiLiveAgentChallenge. |
 | **Categories** | **Live Agent** (real-time voice + interruption) · **UI Navigator** (computer use + 20 browser tools) |
@@ -90,7 +90,7 @@ Phantom is a voice-controlled AI agent that lives in your Chrome side panel. You
 
 <div align="center">
 <a href="https://chromewebstore.google.com/detail/phantom/pfhlohjaccmfjocncjieckpphcamfeom">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/media/chrome-web-store.png" alt="Phantom on Chrome Web Store" width="660" />
+<img src="media/chrome-web-store.png" alt="Phantom on Chrome Web Store" width="660" />
 </a>
 </div>
 
@@ -105,7 +105,7 @@ Free from [Google AI Studio](https://aistudio.google.com/apikey).
 Open the side panel, pick a persona, tap the mic.
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/media/phantom-quickstart.gif" alt="Quick Start Demo" height="300" />
+<img src="media/phantom-quickstart.gif" alt="Quick Start Demo" height="300" />
 </div>
 
 ---
@@ -117,7 +117,7 @@ Phantom's architecture is split across two layers: a Chrome extension that handl
 ### Architecture
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/system-architecture.svg" alt="System Architecture" />
+<img src="docs/system-architecture.svg" alt="System Architecture" />
 </div>
 
 The extension maintains a single persistent WebSocket connection through the proxy to the Gemini Live API. All communication — audio, text, tool calls, tool responses, vision frames, tab audio — flows through this one socket. The proxy is stateless; it relays messages verbatim and manages the GenAI SDK session object.
@@ -125,7 +125,7 @@ The extension maintains a single persistent WebSocket connection through the pro
 ### Voice Interaction Loop
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/voice-loop.svg" alt="Voice Interaction Loop" />
+<img src="docs/voice-loop.svg" alt="Voice Interaction Loop" />
 </div>
 
 The voice loop is the core interaction cycle:
@@ -142,7 +142,7 @@ The model handles turn-taking natively through voice activity detection. When th
 ### Tool Execution Pipeline
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/tool-execution.svg" alt="Tool Execution Pipeline" />
+<img src="docs/tool-execution.svg" alt="Tool Execution Pipeline" />
 </div>
 
 Phantom exposes 20 browser tools to Gemini as function declarations. When the model decides to use a tool, it sends a `toolCall` message through the WebSocket. The extension's `LiveSession` client receives it, dispatches to `executeTool()`, and sends the result back as a `toolResponse`. Gemini then continues its turn — it may speak, call more tools, or finish.
@@ -162,11 +162,11 @@ The agent is instructed to prefer `computerAction` (AI vision clicking) as its p
 ### Computer Use — AI Vision Clicking
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/computer-use.svg" alt="Computer Use Pipeline" />
+<img src="docs/computer-use.svg" alt="Computer Use Pipeline" />
 </div>
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/media/phantom-computer-use-detail.gif" alt="Computer Use in Action" height="300" />
+<img src="media/phantom-computer-use-detail.gif" alt="Computer Use in Action" height="300" />
 </div>
 
 Computer Use is a sidecar AI pipeline for coordinate-level clicking. When the voice model calls `computerAction("click the blue login button")`, the extension:
@@ -183,7 +183,7 @@ This works on everything — canvas elements, iframes, video players, complex UI
 ### Memory System
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/memory-system.svg" alt="Memory System" />
+<img src="docs/memory-system.svg" alt="Memory System" />
 </div>
 
 Phantom remembers you across sessions through three layers:
@@ -201,7 +201,7 @@ All memory lives in Chrome's local storage. Nothing leaves your device.
 Sensitive content is automatically blurred before any screenshot reaches the AI.
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/privacy-pipeline.svg" alt="Privacy Shield Pipeline" />
+<img src="docs/privacy-pipeline.svg" alt="Privacy Shield Pipeline" />
 </div>
 
 Before every vision frame capture, the privacy shield:
@@ -218,7 +218,7 @@ The entire pipeline runs in ~30ms per frame. Detection uses both CSS selectors (
 Phantom ships with 9 personas, each with a unique Gemini voice, system prompt personality, and pixel-art sprite animations (idle, listening, talking, thinking states):
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/media/phantom-personas.gif" alt="Personas" height="300" />
+<img src="media/phantom-personas.gif" alt="Personas" height="300" />
 </div>
 
 Personas are defined in `extension/lib/personas.ts`. Switching personas disconnects and reconnects with a new system prompt and voice. The animated mascot in the UI reflects the current state — sleeping when disconnected, listening when the mic is on, talking when the agent speaks, and thinking when a tool is executing.
@@ -246,7 +246,7 @@ Gemini Live API connections have a time limit. When the server sends a `GoAway` 
 ### Browser Events — Proactive Agent Loop
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/browser-events.svg" alt="Browser Events — Proactive Agent Loop" />
+<img src="docs/browser-events.svg" alt="Browser Events — Proactive Agent Loop" />
 </div>
 
 Without external signals, the agent goes silent after executing a tool — it gets the tool result back but has no idea the world changed. A page loaded, a tab switched, a title updated. The agent just... stops.
@@ -264,7 +264,7 @@ This creates a proactive loop: the agent calls `openTab` → the page loads → 
 ### Session Continuity — Reconnect with Trace
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/youneslaaroussi/Phantom/main/docs/session-continuity.svg" alt="Session Continuity — Reconnect with Trace" />
+<img src="docs/session-continuity.svg" alt="Session Continuity — Reconnect with Trace" />
 </div>
 
 When the WebSocket drops unexpectedly mid-conversation, the auto-reconnect creates a new session — but the agent has no memory of what just happened. Previously, it would say "Hi!" again and the user had to re-explain everything.
