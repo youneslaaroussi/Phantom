@@ -37,6 +37,7 @@ Voice-powered AI agent for Chrome — clicks, scrolls, reads, and navigates for 
 | **Architecture Diagram** | [System Architecture](https://github.com/youneslaaroussi/Phantom/blob/main/docs/system-architecture.svg) + [8 more subsystem diagrams](docs/) |
 | **Automated Deployment** | Single-command deploy: Docker build → Artifact Registry → Cloud Run → GitHub Release — [`deploy.sh`](deploy.sh), [CI/CD Actions](https://github.com/youneslaaroussi/Phantom/actions) |
 | **Blog** | [Full building story](blog/phantom-building-story.md) covering architecture, privacy, character design, and AI-assisted development. Created for the #GeminiLiveAgentChallenge. |
+| **GCP Deployment Proof** | [Cloud Run console walkthrough](https://youtu.be/MCA8x0bTAR4) · [`connection-mode.ts`](https://github.com/youneslaaroussi/Phantom/blob/main/extension/lib/connection-mode.ts) |
 | **Categories** | **Live Agent** (real-time voice + interruption) · **UI Navigator** (computer use + 20 browser tools) |
 
 ---
@@ -78,7 +79,7 @@ Phantom is a voice-controlled AI agent that lives in your Chrome side panel. You
 - Tab audio streaming — Phantom hears what you hear (videos, podcasts, music playing in the browser)
 - Persistent memory with local vector embeddings (all-MiniLM-L6-v2) — remembers you across sessions
 - Privacy shield that auto-blurs passwords, credit cards, and SSNs before any screenshot reaches the AI
-- 9 pixel-art personas, each with a unique voice, personality, and sprite animations
+- 8 pixel-art personas, each with a unique voice, personality, and sprite animations
 
 ---
 
@@ -180,6 +181,8 @@ Computer Use is a sidecar AI pipeline for coordinate-level clicking. When the vo
 
 This works on everything — canvas elements, iframes, video players, complex UIs — because it operates on pixels, not DOM selectors.
 
+If native Gemini 3 Flash computer use is unavailable, the server falls back to Gemini 2.5 Flash for vision-based coordinate prediction from the same screenshot.
+
 ### Memory System
 
 <div align="center">
@@ -215,7 +218,7 @@ The entire pipeline runs in ~30ms per frame. Detection uses both CSS selectors (
 
 ### Personas
 
-Phantom ships with 9 personas, each with a unique Gemini voice, system prompt personality, and pixel-art sprite animations (idle, listening, talking, thinking states):
+Phantom ships with 8 personas, each with a unique Gemini voice, system prompt personality, and pixel-art sprite animations (idle, listening, talking, thinking states):
 
 <div align="center">
 <img src="media/phantom-personas.gif" alt="Personas" height="300" />
@@ -288,7 +291,7 @@ Now, on unexpected disconnect:
 | **Memory** | User profile + session memories with local vector embeddings (all-MiniLM-L6-v2) |
 | **Content actions** | Highlight text on page for AI summary, rewrite, explain, translate |
 | **Privacy shield** | Auto-blurs passwords, credit cards, API keys, SSNs before screenshots |
-| **9 personas** | Each with unique voice, sprite animations, and personality |
+| **8 personas** | Each with unique voice, sprite animations, and personality |
 | **Computer use** | AI vision coordinate clicking for canvas, iframes, complex UIs |
 | **Tab audio** | Stream page audio to the model — it can hear what you hear |
 | **Session resumption** | Seamless reconnect after WebSocket resets |
