@@ -34,7 +34,7 @@ Voice-powered AI agent for Chrome — clicks, scrolls, reads, and navigates for 
 | **Gemini Model** | Gemini 2.5 Flash Native Audio via Live API — [`server/src/proxy.ts`](server/src/proxy.ts) |
 | **Google GenAI SDK** | `@google/genai` for Live sessions, computer use, summarization — [`server/src/proxy.ts`](server/src/proxy.ts), [`server/src/computer-use.ts`](server/src/computer-use.ts), [`server/src/summarize.ts`](server/src/summarize.ts) |
 | **Google Cloud Service** | Cloud Run (WebSocket proxy + AI endpoints) — [`deploy.sh`](deploy.sh), [`server/Dockerfile`](server/Dockerfile) |
-| **Architecture Diagram** | [System Architecture](docs/system-architecture.svg?raw=true) + [8 more subsystem diagrams](docs/) |
+| **Architecture Diagram** | [System Architecture](https://github.com/youneslaaroussi/Phantom/blob/main/docs/system-architecture.svg) + [8 more subsystem diagrams](docs/) |
 | **Automated Deployment** | Single-command deploy: Docker build → Artifact Registry → Cloud Run → GitHub Release — [`deploy.sh`](deploy.sh), [CI/CD Actions](https://github.com/youneslaaroussi/Phantom/actions) |
 | **Blog** | [Full building story](blog/phantom-building-story.md) covering architecture, privacy, character design, and AI-assisted development. Created for the #GeminiLiveAgentChallenge. |
 | **Categories** | **Live Agent** (real-time voice + interruption) · **UI Navigator** (computer use + 20 browser tools) |
