@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="devpost-covers/05_retro_pixel.png" alt="Phantom Cover" width="100%" />
+
 <img src="extension/assets/icon.png" alt="Phantom" width="128" />
 
 # Phantom
@@ -22,6 +24,20 @@ Voice-powered AI agent for Chrome — clicks, scrolls, reads, and navigates for 
 <img src="media/phantom-demo.gif" alt="Phantom Demo" height="400" />
 <img src="media/phantom-computer-use.gif" alt="Computer Use Demo" height="400" />
 </div>
+
+---
+
+## Hackathon Submission — Quick Links for Judges
+
+| Requirement | Evidence |
+|---|---|
+| **Gemini Model** | Gemini 2.5 Flash Native Audio via Live API — [`server/src/proxy.ts`](server/src/proxy.ts) |
+| **Google GenAI SDK** | `@google/genai` for Live sessions, computer use, summarization — [`server/src/proxy.ts`](server/src/proxy.ts), [`server/src/computer-use.ts`](server/src/computer-use.ts), [`server/src/summarize.ts`](server/src/summarize.ts) |
+| **Google Cloud Service** | Cloud Run (WebSocket proxy + AI endpoints) — [`deploy.sh`](deploy.sh), [`server/Dockerfile`](server/Dockerfile) |
+| **Architecture Diagram** | [System Architecture](docs/system-architecture.svg) + [8 more subsystem diagrams](docs/) |
+| **Automated Deployment** | Single-command deploy: Docker build → Artifact Registry → Cloud Run → GitHub Release — [`deploy.sh`](deploy.sh) |
+| **Blog** | [Full building story](blog/phantom-building-story.md) covering architecture, privacy, character design, and AI-assisted development. Created for the #GeminiLiveAgentChallenge. |
+| **Categories** | **Live Agent** (real-time voice + interruption) · **UI Navigator** (computer use + 20 browser tools) |
 
 ---
 
@@ -70,7 +86,15 @@ Phantom is a voice-controlled AI agent that lives in your Chrome side panel. You
 
 ### 1. Install the extension
 
-Download from [Releases](https://github.com/youneslaaroussi/Phantom/releases/latest), unzip, load unpacked in `chrome://extensions`.
+**Fastest:** Install directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/phantom/pfhlohjaccmfjocncjieckpphcamfeom).
+
+<div align="center">
+<a href="https://chromewebstore.google.com/detail/phantom/pfhlohjaccmfjocncjieckpphcamfeom">
+<img src="media/chrome-web-store.png" alt="Phantom on Chrome Web Store" width="660" />
+</a>
+</div>
+
+**Or manually:** Download from [Releases](https://github.com/youneslaaroussi/Phantom/releases/latest), unzip, load unpacked in `chrome://extensions`.
 
 ### 2. Get a Gemini API key
 
